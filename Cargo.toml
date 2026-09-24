@@ -1,0 +1,51 @@
+[package]
+name = "xrcomp"
+version = "0.1.0"
+edition = "2024"
+license = "Apache 2.0"
+publish = false
+
+[dependencies]
+bitflags = "2.2.1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dependencies.smithay]
+git = "https://github.com/Smithay/smithay.git"
+rev = "79bbed5e1199090d787115614847a79c76607181"
+default-features = false
+features = ["desktop", "wayland_frontend"]
+
+[dependencies.smithay-drm-extras]
+git = "https://github.com/Smithay/smithay.git"
+rev = "79bbed5e1199090d787115614847a79c76607181"
+optional = true
+
+[features]
+default = ["udev", "x11"]
+
+# The udev/DRM/libinput/libseat backend: runs on a raw TTY, drives the GPU
+# directly via KMS and reads input devices via libinput. This is the
+# backend intended for normal, everyday use.
+udev = [
+    "dep:smithay-drm-extras",
+    "smithay/backend_libinput",
+    "smithay/backend_udev",
+    "smithay/backend_drm",
+    "smithay/backend_gbm",
+    "smithay/backend_egl",
+    "smithay/backend_session_libseat",
+    "smithay/renderer_gl",
+    "smithay/use_system_lib",
+]
+
+# The X11 backend: runs xrcomp as a window inside an existing X11 session.
+# Convenient for development and testing without needing a spare TTY/GPU
+# lease, but not intended as the primary way to run the compositor.
+x11 = [
+    "smithay/backend_x11",
+    "smithay/backend_egl",
+    "smithay/renderer_gl",
+    "smithay/use_system_lib",
+]
