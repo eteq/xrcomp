@@ -24,7 +24,7 @@ use smithay::{
 
 /// Backend-specific hooks that the shared compositor state needs to call into.
 ///
-/// Both the udev and x11 backends implement this, which lets everything in
+/// Every backend (udev, x11, winit) implements this, which lets everything in
 /// `handlers/`, `grabs/` and `input.rs` stay generic over `State<BackendData>`
 /// instead of being duplicated per backend.
 pub trait Backend {

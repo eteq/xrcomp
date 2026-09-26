@@ -1,8 +1,8 @@
-//! Shared rendering helpers used by both backends.
+//! Shared rendering helpers used by all backends.
 //!
 //! xrcomp does not render a themed/client cursor image; it just draws a
 //! small solid-colored square at the pointer location so there is visual
-//! feedback of where the pointer is on backends (udev, x11) that don't get
+//! feedback of where the pointer is on backends (udev, x11, winit) that don't get
 //! a cursor drawn for them by a host compositor.
 
 use smithay::{
@@ -18,8 +18,8 @@ use smithay::{
 
 pub const CLEAR_COLOR: Color32F = Color32F::new(0.1, 0.1, 0.1, 1.0);
 
-// The set of render elements used for both backends: whatever a `Space<Window>` produces,
-// plus our software cursor square. Both backends only ever use `GlesRenderer`, so this is
+// The set of render elements used for all backends: whatever a `Space<Window>` produces,
+// plus our software cursor square. All backends only ever use `GlesRenderer`, so this is
 // tied to that concrete type rather than being generic, which sidesteps having to restate
 // `GlesRenderer`'s (rather large) set of import trait bounds here.
 smithay::backend::renderer::element::render_elements! {

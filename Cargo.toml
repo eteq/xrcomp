@@ -23,7 +23,7 @@ rev = "79bbed5e1199090d787115614847a79c76607181"
 optional = true
 
 [features]
-default = ["udev", "x11"]
+default = ["udev", "x11", "winit"]
 
 # The udev/DRM/libinput/libseat backend: runs on a raw TTY, drives the GPU
 # directly via KMS and reads input devices via libinput. This is the
@@ -46,6 +46,15 @@ udev = [
 x11 = [
     "smithay/backend_x11",
     "smithay/backend_egl",
+    "smithay/renderer_gl",
+    "smithay/use_system_lib",
+]
+
+# The winit backend: runs xrcomp as a window inside an existing Wayland or X11
+# session. Like x11, intended for development and testing.
+winit = [
+    "smithay/backend_winit",
+    "smithay/backend_drm",
     "smithay/renderer_gl",
     "smithay/use_system_lib",
 ]

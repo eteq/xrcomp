@@ -6,6 +6,8 @@ mod state;
 
 #[cfg(feature = "udev")]
 mod udev;
+#[cfg(feature = "winit")]
+mod winit;
 #[cfg(feature = "x11")]
 mod x11;
 
@@ -24,6 +26,11 @@ fn main() {
             tracing::info!("Starting xrcomp with the x11 backend");
             x11::run_x11();
         }
+        #[cfg(feature = "winit")]
+        Some("winit") => {
+            tracing::info!("Starting xrcomp with the winit backend");
+            winit::run_winit();
+        }
         Some(other) => {
             eprintln!("Unknown backend: {other}");
             print_usage();
@@ -34,10 +41,11 @@ fn main() {
 }
 
 fn print_usage() {
-    println!("USAGE: xrcomp [udev | x11]");
+    println!("USAGE: xrcomp [udev | x11 | winit]");
     println!();
     println!("  udev   Run on a raw tty using udev/DRM/libinput (default, requires a seat).");
     println!("  x11    Run nested in an existing X11 session. Intended for development.");
+    println!("  winit  Run nested in an existing Wayland or X11 session. Intended for development.");
 }
 
 fn init_logging() {
@@ -53,7 +61,7 @@ fn spawn_client() {
     let mut args = std::env::args().skip(1);
     // Skip a leading backend selector so `-c`/`--command` still works after it.
     let mut flag = args.next();
-    if matches!(flag.as_deref(), Some("udev") | Some("x11")) {
+    if matches!(flag.as_deref(), Some("udev") | Some("x11") | Some("winit")) {
         flag = args.next();
     }
     let arg = args.next();
