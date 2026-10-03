@@ -2,6 +2,9 @@
   "build": {
         "dockerfile": "Dockerfile"
     },
+  "mounts": [
+    "source=vscode-server-${devcontainerId},target=/root/.vscode-server,type=volume"
+  ],
   "customizations": {
     "vscode": {
       "extensions": [
