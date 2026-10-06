@@ -45,7 +45,7 @@ fn print_usage() {
     println!();
     println!("  udev   Run on a raw tty using udev/DRM/libinput (default, requires a seat).");
     println!("  x11    Run nested in an existing X11 session. Intended for development.");
-    println!("  winit  Run nested in an existing Wayland or X11 session. Intended for development.");
+    println!("  winit  Run nested in an existing Wayland (or x11) session using winit. Intended for development.");
 }
 
 fn init_logging() {
@@ -57,6 +57,8 @@ fn init_logging() {
 }
 
 /// Spawn a client to run under xrcomp, mirroring smallvil's `-c`/`--command` flag.
+/// This is primarily convenient for testing, and is here because its identical for 
+/// all backends.
 fn spawn_client() {
     let mut args = std::env::args().skip(1);
     // Skip a leading backend selector so `-c`/`--command` still works after it.

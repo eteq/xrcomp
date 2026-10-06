@@ -41,8 +41,8 @@ udev = [
 ]
 
 # The X11 backend: runs xrcomp as a window inside an existing X11 session.
-# Convenient for development and testing without needing a spare TTY/GPU
-# lease, but not intended as the primary way to run the compositor.
+# Convenient for development and testing, but not intended as the primary 
+# way to actually use the compositor.
 x11 = [
     "smithay/backend_x11",
     "smithay/backend_egl",
@@ -50,8 +50,8 @@ x11 = [
     "smithay/use_system_lib",
 ]
 
-# The winit backend: runs xrcomp as a window inside an existing Wayland or X11
-# session. Like x11, intended for development and testing.
+# The winit backend: runs xrcomp as a window inside an existing Wayland
+# (or x11) session. Like x11, intended for development and testing.
 winit = [
     "smithay/backend_winit",
     "smithay/backend_drm",

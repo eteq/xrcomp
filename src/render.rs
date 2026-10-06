@@ -2,7 +2,7 @@
 //!
 //! xrcomp does not render a themed/client cursor image; it just draws a
 //! small solid-colored square at the pointer location so there is visual
-//! feedback of where the pointer is on backends (udev, x11, winit) that don't get
+//! feedback of where the pointer is on backends that don't get
 //! a cursor drawn for them by a host compositor.
 
 use smithay::{
