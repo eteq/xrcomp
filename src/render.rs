@@ -5,11 +5,11 @@
 //! feedback of where the pointer is on backends that don't get
 //! a cursor drawn for them by a host compositor.
 
+use crate::renderer::XrRenderer;
 use smithay::{
     backend::renderer::{
         Color32F,
         element::{Kind, solid::SolidColorRenderElement, surface::WaylandSurfaceRenderElement},
-        gles::GlesRenderer,
     },
     desktop::space::SpaceRenderElements,
     output::Output,
@@ -19,12 +19,12 @@ use smithay::{
 pub const CLEAR_COLOR: Color32F = Color32F::new(0.1, 0.1, 0.1, 1.0);
 
 // The set of render elements used for all backends: whatever a `Space<Window>` produces,
-// plus our software cursor square. All backends only ever use `GlesRenderer`, so this is
+// plus our software cursor square. All backends only ever use `XrRenderer`, so this is
 // tied to that concrete type rather than being generic, which sidesteps having to restate
-// `GlesRenderer`'s (rather large) set of import trait bounds here.
+// `XrRenderer`'s (rather large) set of import trait bounds here.
 smithay::backend::renderer::element::render_elements! {
-    pub OutputElement<=GlesRenderer>;
-    Space=SpaceRenderElements<GlesRenderer, WaylandSurfaceRenderElement<GlesRenderer>>,
+    pub OutputElement<=XrRenderer>;
+    Space=SpaceRenderElements<XrRenderer, WaylandSurfaceRenderElement<XrRenderer>>,
     Cursor=SolidColorRenderElement,
 }
 

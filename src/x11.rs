@@ -11,7 +11,7 @@ use smithay::{
             gbm::{GbmAllocator, GbmBufferFlags},
         },
         egl::{EGLContext, EGLDisplay},
-        renderer::{Bind, ImportDma, ImportEgl, ImportMemWl, damage::OutputDamageTracker, gles::GlesRenderer},
+        renderer::{Bind, ImportDma, ImportEgl, ImportMemWl, damage::OutputDamageTracker},
         x11::{WindowBuilder, X11Backend, X11Event, X11Surface},
     },
     output::{Mode, Output, PhysicalProperties, Subpixel},
@@ -22,6 +22,7 @@ use smithay::{
 use tracing::{error, info, warn};
 
 use crate::{
+    renderer::XrRenderer,
     render::Cursor,
     spawn_client,
     state::{Backend, State},
@@ -31,7 +32,7 @@ pub const OUTPUT_NAME: &str = "x11";
 
 pub struct X11Data {
     surface: X11Surface,
-    renderer: GlesRenderer,
+    renderer: XrRenderer,
     damage_tracker: OutputDamageTracker,
     dmabuf_state: DmabufState,
     _dmabuf_global: DmabufGlobal,
@@ -87,7 +88,7 @@ pub fn run_x11() {
         )
         .expect("Failed to create X11 surface");
 
-    let mut renderer = unsafe { GlesRenderer::new(context) }.expect("Failed to initialize renderer");
+    let mut renderer = unsafe { XrRenderer::new(context) }.expect("Failed to initialize renderer");
     if renderer.bind_wl_display(&display_handle).is_ok() {
         info!("EGL hardware-acceleration enabled");
     }

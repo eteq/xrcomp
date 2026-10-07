@@ -8,7 +8,7 @@ use smithay::{
     backend::{
         allocator::dmabuf::Dmabuf,
         egl::EGLDevice,
-        renderer::{ImportDma, ImportEgl, ImportMemWl, damage::OutputDamageTracker, gles::GlesRenderer},
+        renderer::{ImportDma, ImportEgl, ImportMemWl, damage::OutputDamageTracker},
         winit::{self, WinitEvent, WinitGraphicsBackend},
     },
     output::{Mode, Output, PhysicalProperties, Subpixel},
@@ -19,6 +19,7 @@ use smithay::{
 use tracing::{error, info, warn};
 
 use crate::{
+    renderer::XrRenderer,
     render::Cursor,
     spawn_client,
     state::{Backend, State},
@@ -27,7 +28,7 @@ use crate::{
 pub const OUTPUT_NAME: &str = "winit";
 
 pub struct WinitData {
-    backend: WinitGraphicsBackend<GlesRenderer>,
+    backend: WinitGraphicsBackend<XrRenderer>,
     damage_tracker: OutputDamageTracker,
     dmabuf_state: DmabufState,
     _dmabuf_global: DmabufGlobal,
@@ -66,7 +67,7 @@ pub fn run_winit() {
     let display_handle = display.handle();
 
     let (mut backend, winit_loop) =
-        winit::init::<GlesRenderer>().expect("Failed to initialize winit backend");
+        winit::init::<XrRenderer>().expect("Failed to initialize winit backend");
 
     if backend.renderer().bind_wl_display(&display_handle).is_ok() {
         info!("EGL hardware-acceleration enabled");

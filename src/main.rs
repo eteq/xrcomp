@@ -2,6 +2,7 @@ mod grabs;
 mod handlers;
 mod input;
 mod render;
+mod renderer;
 mod state;
 
 #[cfg(feature = "udev")]

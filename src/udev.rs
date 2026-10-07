@@ -20,7 +20,7 @@ use smithay::{
         },
         egl::{EGLContext, EGLDisplay},
         libinput::{LibinputInputBackend, LibinputSessionInterface},
-        renderer::{ImportDma, ImportEgl, ImportMemWl, gles::GlesRenderer},
+        renderer::{ImportDma, ImportEgl, ImportMemWl},
         session::{Event as SessionEvent, Session, libseat::LibSeatSession},
         udev::{UdevBackend, UdevEvent, all_gpus, primary_gpu},
     },
@@ -47,6 +47,7 @@ use smithay_drm_extras::drm_scanner::{DrmScanEvent, DrmScanner};
 use tracing::{error, info, warn};
 
 use crate::{
+    renderer::XrRenderer,
     render::{CLEAR_COLOR, Cursor, OutputElement, output_scale},
     spawn_client,
     state::{Backend, State},
@@ -65,7 +66,7 @@ struct SurfaceData {
 
 pub struct UdevData {
     session: LibSeatSession,
-    renderer: GlesRenderer,
+    renderer: XrRenderer,
     drm_output_manager: UdevDrmOutputManager,
     drm_scanner: DrmScanner,
     surfaces: HashMap<crtc::Handle, SurfaceData>,
@@ -131,7 +132,7 @@ pub fn run_udev() {
 
     let egl_display = unsafe { EGLDisplay::new(gbm.clone()).expect("Failed to create EGLDisplay") };
     let egl_context = EGLContext::new(&egl_display).expect("Failed to create EGLContext");
-    let mut renderer = unsafe { GlesRenderer::new(egl_context) }.expect("Failed to initialize renderer");
+    let mut renderer = unsafe { XrRenderer::new(egl_context) }.expect("Failed to initialize renderer");
     if renderer.bind_wl_display(&display_handle).is_ok() {
         info!("EGL hardware-acceleration enabled");
     }

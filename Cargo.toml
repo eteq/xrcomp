@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 bitflags = "2.2.1"
+glow = "0.16"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
