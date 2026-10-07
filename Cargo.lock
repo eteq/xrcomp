@@ -1438,6 +1438,7 @@ dependencies = [
  "gbm",
  "gl_generator",
  "glam",
+ "glow",
  "indexmap",
  "input",
  "libc",
@@ -2554,6 +2555,7 @@ name = "xrcomp"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "glam",
  "glow",
  "smithay",
  "smithay-drm-extras",

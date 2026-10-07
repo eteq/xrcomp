@@ -5,27 +5,35 @@
 //! feedback of where the pointer is on backends that don't get
 //! a cursor drawn for them by a host compositor.
 
-use crate::renderer::XrRenderer;
 use smithay::{
     backend::renderer::{
         Color32F,
-        element::{Kind, solid::SolidColorRenderElement, surface::WaylandSurfaceRenderElement},
+        element::{Kind, solid::SolidColorRenderElement},
+        glow::GlowRenderer,
     },
-    desktop::space::SpaceRenderElements,
     output::Output,
     utils::{Physical, Point},
 };
 
 pub const CLEAR_COLOR: Color32F = Color32F::new(0.1, 0.1, 0.1, 1.0);
 
-// The set of render elements used for all backends: whatever a `Space<Window>` produces,
-// plus our software cursor square. All backends only ever use `XrRenderer`, so this is
-// tied to that concrete type rather than being generic, which sidesteps having to restate
-// `XrRenderer`'s (rather large) set of import trait bounds here.
+// The set of render elements used for all backends: the 3D scene (see `scene.rs`), which
+// draws every window, plus our software cursor square. All backends only ever use
+// `GlowRenderer`, so this is tied to that concrete type rather than being generic.
 smithay::backend::renderer::element::render_elements! {
-    pub OutputElement<=XrRenderer>;
-    Space=SpaceRenderElements<XrRenderer, WaylandSurfaceRenderElement<XrRenderer>>,
+    pub OutputElement<=GlowRenderer>;
+    Scene=crate::scene::SceneElement,
     Cursor=SolidColorRenderElement,
+}
+
+/// The elements for one output frame, front to back: the cursor on top of the scene.
+pub fn output_elements(
+    cursor: SolidColorRenderElement,
+    scene: Option<crate::scene::SceneElement>,
+) -> Vec<OutputElement> {
+    std::iter::once(OutputElement::Cursor(cursor))
+        .chain(scene.map(OutputElement::Scene))
+        .collect()
 }
 
 pub struct Cursor {

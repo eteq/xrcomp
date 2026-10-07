@@ -20,11 +20,10 @@ use smithay::{
         },
         egl::{EGLContext, EGLDisplay},
         libinput::{LibinputInputBackend, LibinputSessionInterface},
-        renderer::{ImportDma, ImportEgl, ImportMemWl},
+        renderer::{ImportDma, ImportEgl, ImportMemWl, glow::GlowRenderer},
         session::{Event as SessionEvent, Session, libseat::LibSeatSession},
         udev::{UdevBackend, UdevEvent, all_gpus, primary_gpu},
     },
-    desktop::space::space_render_elements,
     output::{Mode as WlMode, Output, PhysicalProperties},
     reexports::{
         calloop::{
@@ -47,8 +46,8 @@ use smithay_drm_extras::drm_scanner::{DrmScanEvent, DrmScanner};
 use tracing::{error, info, warn};
 
 use crate::{
-    renderer::XrRenderer,
-    render::{CLEAR_COLOR, Cursor, OutputElement, output_scale},
+    render::{CLEAR_COLOR, Cursor, OutputElement, output_elements, output_scale},
+    scene::Scene,
     spawn_client,
     state::{Backend, State},
 };
@@ -66,13 +65,14 @@ struct SurfaceData {
 
 pub struct UdevData {
     session: LibSeatSession,
-    renderer: XrRenderer,
+    renderer: GlowRenderer,
     drm_output_manager: UdevDrmOutputManager,
     drm_scanner: DrmScanner,
     surfaces: HashMap<crtc::Handle, SurfaceData>,
     dmabuf_state: DmabufState,
     _dmabuf_global: DmabufGlobal,
     cursor: Cursor,
+    scene: Scene,
 }
 
 impl Backend for UdevData {
@@ -132,7 +132,7 @@ pub fn run_udev() {
 
     let egl_display = unsafe { EGLDisplay::new(gbm.clone()).expect("Failed to create EGLDisplay") };
     let egl_context = EGLContext::new(&egl_display).expect("Failed to create EGLContext");
-    let mut renderer = unsafe { XrRenderer::new(egl_context) }.expect("Failed to initialize renderer");
+    let mut renderer = unsafe { GlowRenderer::new(egl_context) }.expect("Failed to initialize renderer");
     if renderer.bind_wl_display(&display_handle).is_ok() {
         info!("EGL hardware-acceleration enabled");
     }
@@ -168,6 +168,7 @@ pub fn run_udev() {
         dmabuf_state,
         _dmabuf_global: dmabuf_global,
         cursor: Cursor::new(),
+        scene: Scene::new(),
     };
 
     let mut state = State::new(&mut event_loop, display, data);
@@ -387,20 +388,9 @@ impl State<UdevData> {
             .cursor
             .render_element(cursor_pos, scale);
 
-        let space_elements =
-            match space_render_elements(&mut self.backend_data.renderer, [&self.space], &output, 1.0) {
-                Ok(elements) => elements,
-                Err(err) => {
-                    warn!("Failed to collect render elements: {:?}", err);
-                    return;
-                }
-            };
-
-        let elements: Vec<OutputElement> = space_elements
-            .into_iter()
-            .map(OutputElement::Space)
-            .chain(std::iter::once(OutputElement::Cursor(cursor_element)))
-            .collect();
+        let backend = &mut self.backend_data;
+        let scene_element = backend.scene.prepare(&mut backend.renderer, &self.space, &output);
+        let elements = output_elements(cursor_element, scene_element);
 
         let Some(surface) = self.backend_data.surfaces.get_mut(&crtc) else {
             return;

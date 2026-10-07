@@ -11,7 +11,7 @@ use smithay::{
             gbm::{GbmAllocator, GbmBufferFlags},
         },
         egl::{EGLContext, EGLDisplay},
-        renderer::{Bind, ImportDma, ImportEgl, ImportMemWl, damage::OutputDamageTracker},
+        renderer::{Bind, ImportDma, ImportEgl, ImportMemWl, damage::OutputDamageTracker, glow::GlowRenderer},
         x11::{WindowBuilder, X11Backend, X11Event, X11Surface},
     },
     output::{Mode, Output, PhysicalProperties, Subpixel},
@@ -22,8 +22,8 @@ use smithay::{
 use tracing::{error, info, warn};
 
 use crate::{
-    renderer::XrRenderer,
-    render::Cursor,
+    render::{CLEAR_COLOR, Cursor, output_elements},
+    scene::Scene,
     spawn_client,
     state::{Backend, State},
 };
@@ -32,11 +32,12 @@ pub const OUTPUT_NAME: &str = "x11";
 
 pub struct X11Data {
     surface: X11Surface,
-    renderer: XrRenderer,
+    renderer: GlowRenderer,
     damage_tracker: OutputDamageTracker,
     dmabuf_state: DmabufState,
     _dmabuf_global: DmabufGlobal,
     cursor: Cursor,
+    scene: Scene,
 }
 
 impl Backend for X11Data {
@@ -88,7 +89,7 @@ pub fn run_x11() {
         )
         .expect("Failed to create X11 surface");
 
-    let mut renderer = unsafe { XrRenderer::new(context) }.expect("Failed to initialize renderer");
+    let mut renderer = unsafe { GlowRenderer::new(context) }.expect("Failed to initialize renderer");
     if renderer.bind_wl_display(&display_handle).is_ok() {
         info!("EGL hardware-acceleration enabled");
     }
@@ -130,6 +131,7 @@ pub fn run_x11() {
         dmabuf_state,
         _dmabuf_global: dmabuf_global,
         cursor: Cursor::new(),
+        scene: Scene::new(),
     };
 
     let mut state = State::new(&mut event_loop, display, data);
@@ -190,6 +192,10 @@ fn render_frame(state: &mut State<X11Data>, output: &Output) -> bool {
 
     let backend_data = &mut state.backend_data;
 
+    let scene_element = backend_data
+        .scene
+        .prepare(&mut backend_data.renderer, &state.space, output);
+
     let (mut buffer, age) = match backend_data.surface.buffer() {
         Ok(b) => b,
         Err(err) => {
@@ -207,16 +213,14 @@ fn render_frame(state: &mut State<X11Data>, output: &Output) -> bool {
 
     let cursor_element = backend_data.cursor.render_element(cursor_pos, scale);
 
-    let render_res = smithay::desktop::space::render_output(
-        output,
+    let elements = output_elements(cursor_element, scene_element);
+
+    let render_res = backend_data.damage_tracker.render_output(
         &mut backend_data.renderer,
         &mut fb,
-        1.0,
         age as usize,
-        [&state.space],
-        &[cursor_element],
-        &mut backend_data.damage_tracker,
-        crate::render::CLEAR_COLOR,
+        &elements,
+        CLEAR_COLOR,
     );
 
     match render_res {

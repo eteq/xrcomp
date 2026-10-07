@@ -8,7 +8,7 @@ use smithay::{
     backend::{
         allocator::dmabuf::Dmabuf,
         egl::EGLDevice,
-        renderer::{ImportDma, ImportEgl, ImportMemWl, damage::OutputDamageTracker},
+        renderer::{ImportDma, ImportEgl, ImportMemWl, damage::OutputDamageTracker, glow::GlowRenderer},
         winit::{self, WinitEvent, WinitGraphicsBackend},
     },
     output::{Mode, Output, PhysicalProperties, Subpixel},
@@ -19,8 +19,8 @@ use smithay::{
 use tracing::{error, info, warn};
 
 use crate::{
-    renderer::XrRenderer,
-    render::Cursor,
+    render::{CLEAR_COLOR, Cursor, output_elements},
+    scene::Scene,
     spawn_client,
     state::{Backend, State},
 };
@@ -28,11 +28,12 @@ use crate::{
 pub const OUTPUT_NAME: &str = "winit";
 
 pub struct WinitData {
-    backend: WinitGraphicsBackend<XrRenderer>,
+    backend: WinitGraphicsBackend<GlowRenderer>,
     damage_tracker: OutputDamageTracker,
     dmabuf_state: DmabufState,
     _dmabuf_global: DmabufGlobal,
     cursor: Cursor,
+    scene: Scene,
 }
 
 impl Backend for WinitData {
@@ -67,7 +68,7 @@ pub fn run_winit() {
     let display_handle = display.handle();
 
     let (mut backend, winit_loop) =
-        winit::init::<XrRenderer>().expect("Failed to initialize winit backend");
+        winit::init::<GlowRenderer>().expect("Failed to initialize winit backend");
 
     if backend.renderer().bind_wl_display(&display_handle).is_ok() {
         info!("EGL hardware-acceleration enabled");
@@ -127,6 +128,7 @@ pub fn run_winit() {
         dmabuf_state,
         _dmabuf_global: dmabuf_global,
         cursor: Cursor::new(),
+        scene: Scene::new(),
     };
 
     let mut state = State::new(&mut event_loop, display, data);
@@ -186,11 +188,23 @@ fn render_frame(state: &mut State<WinitData>, output: &Output) -> bool {
         backend,
         damage_tracker,
         cursor,
+        scene,
         ..
     } = &mut state.backend_data;
 
+    // EGL only reports the buffer age of the surface that is current. The window surface
+    // stays current from the previous frame unless something since then rendered into a
+    // texture or imported a buffer (which leaves the context current without a surface,
+    // as `scene.prepare` below does), so query it first and fall back to a full redraw.
+    let age = if backend.egl_surface().is_current() {
+        backend.buffer_age().unwrap_or(0)
+    } else {
+        0
+    };
+
     let cursor_element = cursor.render_element(cursor_pos, scale);
-    let age = backend.buffer_age().unwrap_or(0);
+    let scene_element = scene.prepare(backend.renderer(), &state.space, output);
+    let elements = output_elements(cursor_element, scene_element);
 
     let render_res = {
         let (renderer, mut fb) = match backend.bind() {
@@ -201,17 +215,7 @@ fn render_frame(state: &mut State<WinitData>, output: &Output) -> bool {
             }
         };
 
-        smithay::desktop::space::render_output(
-            output,
-            renderer,
-            &mut fb,
-            1.0,
-            age,
-            [&state.space],
-            &[cursor_element],
-            damage_tracker,
-            crate::render::CLEAR_COLOR,
-        )
+        damage_tracker.render_output(renderer, &mut fb, age, &elements, CLEAR_COLOR)
     };
 
     match render_res {
