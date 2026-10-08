@@ -57,22 +57,3 @@ fn init_logging() {
     }
 }
 
-/// Spawn a client to run under xrcomp, mirroring smallvil's `-c`/`--command` flag.
-/// This is primarily convenient for testing, and is here because its identical for 
-/// all backends.
-fn spawn_client() {
-    let mut args = std::env::args().skip(1);
-    // Skip a leading backend selector so `-c`/`--command` still works after it.
-    let mut flag = args.next();
-    if matches!(flag.as_deref(), Some("udev") | Some("x11") | Some("winit")) {
-        flag = args.next();
-    }
-    let arg = args.next();
-
-    match (flag.as_deref(), arg) {
-        (Some("-c") | Some("--command"), Some(command)) => {
-            std::process::Command::new(command).spawn().ok();
-        }
-        _ => {}
-    }
-}

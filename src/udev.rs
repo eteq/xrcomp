@@ -48,7 +48,6 @@ use tracing::{error, info, warn};
 use crate::{
     render::{CLEAR_COLOR, Cursor, OutputElement, output_elements, output_scale},
     scene::Scene,
-    spawn_client,
     state::{Backend, State},
 };
 
@@ -252,7 +251,6 @@ pub fn run_udev() {
     state.scan_connectors();
 
     unsafe { std::env::set_var("WAYLAND_DISPLAY", &state.socket_name) };
-    spawn_client();
 
     info!("Initialization completed, starting the main loop.");
 

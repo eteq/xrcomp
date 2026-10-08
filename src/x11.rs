@@ -24,7 +24,6 @@ use tracing::{error, info, warn};
 use crate::{
     render::{CLEAR_COLOR, Cursor, output_elements},
     scene::Scene,
-    spawn_client,
     state::{Backend, State},
 };
 
@@ -141,7 +140,6 @@ pub fn run_x11() {
     state.space.map_output(&output, (0, 0));
 
     unsafe { std::env::set_var("WAYLAND_DISPLAY", &state.socket_name) };
-    spawn_client();
 
     let output_clone = output.clone();
     event_loop
