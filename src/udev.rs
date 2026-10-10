@@ -256,12 +256,16 @@ pub fn run_udev() {
 
     while state.running {
         let result = event_loop.dispatch(Some(Duration::from_millis(16)), &mut state);
-        if result.is_err() {
-            state.running = false;
-        } else {
-            state.space.refresh();
-            state.popups.cleanup();
-            let _ = state.display_handle.flush_clients();
+        match result {
+            Ok(_) => {
+                state.space.refresh();
+                state.popups.cleanup();
+                let _ = state.display_handle.flush_clients();
+            }
+            Err(err) => {
+                error!("Event loop dispatch error: {:?}", err);
+                state.running = false;
+            }
         }
     }
 }
