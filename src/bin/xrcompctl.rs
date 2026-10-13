@@ -1,75 +1,64 @@
-use std::{env, io::Write};
+use std::io::Write;
+
+use clap::Parser;
 
 use interprocess::local_socket::{prelude::*, GenericNamespaced, Stream};
 
 use serde_json;
 
-use xrcomp::comms::{Command, CommandResponse};
+use xrcomp::comms::{Command, CommandResponse, get_default_socket_name};
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    /// optional local socket name (tries the default if not given)
+    socket_name: Option<String>,
+
+    /// Increased verbosity
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    verbosity: u8,
+
+    #[command(subcommand)]
+    command: Command,
+}
+
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let cli = Cli::parse();
 
-    match args.len() {
-        2 => {
-            let command: Option<Command>;
-            match args[1].to_lowercase().as_str() {
+    let socket_printname = match cli.socket_name {
+        Some(n) => n,
+        None => get_default_socket_name()
+    };
 
-                "exit" => {
-                    println!("Sending exit command to compositor...");
-                    command = Some(Command::Exit);
-                }
-                "getwaylandsocket" => {
-                    println!("Requesting Wayland socket from compositor...");
-                    command = Some(Command::GetWaylandSocket);
-                }
-                _ => { 
-                    command = None;
-                }
+    let cmdstring =  serde_json::to_string(&cli.command).unwrap();
+    if cli.verbosity > 0 { println!("Serialized command to send: {}", cmdstring); }
+
+    let socket_name = socket_printname.to_ns_name::<GenericNamespaced>().expect("Getting IPC name failed");
+    let mut conn = Stream::connect(socket_name).expect("could not connect to IPC socket");
+    conn.write_all(cmdstring.as_bytes()).expect("failed to write command");
+
+    if cli.verbosity > 0 { println!("Sent command"); }
+
+    let resp: CommandResponse = match serde_json::from_reader(conn) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Failed to parse command response: {e:?}");
+            return
+        } 
+    };
+    if resp.success {
+        if cli.verbosity > 0 { println!("Command executed successfully."); }
+        match resp.result {
+            Some(r) => { 
+                if cli.verbosity > 0 { println!("Command has a response:"); }
+                println!("{r}");
+            },
+            None => {
+                if cli.verbosity > 0 { println!("Command has no response."); }
             }
-
-            match command {
-
-                Some(cmd) => {
-                    let cmdstring =  serde_json::to_string(&cmd).unwrap();
-                    println!("Serialized command: {}", cmdstring);
-
-
-                    let socket_printname = "ipcc";
-                    let socket_name = socket_printname.to_ns_name::<GenericNamespaced>().expect("Getting IPC name failed");
-                    let mut conn = Stream::connect(socket_name).expect("could not connect to IPC socket");
-
-                    conn.write_all(cmdstring.as_bytes()).expect("failed to write command");
-
-                    let resp: CommandResponse = match serde_json::from_reader(conn) {
-                        Ok(r) => r,
-                        Err(e) => {
-                            eprintln!("Failed to parse command response: {e:?}");
-                            return
-                        } 
-                    };
-
-                    if resp.success {
-                        println!("Command executed successfully.");
-                        if resp.result.is_some() {
-                            println!("Result: {}", resp.result.unwrap());
-                        }
-                    } else {
-                        eprintln!("Command failed.");
-                    }
-                }
-                None => print_command_help(),
-            }
-        }
-        _ => print_usage(),
+        } 
+    } else {
+        eprintln!("Command failed.");
     }
-}
-
-fn print_usage() {
-    println!("usage: xrcompctl <command>");
-}
-
-fn print_command_help() {
-    println!("Unrecognized command. Available commands:");
-    println!("  exit              - Exit the compositor");
-    println!("  getwaylandsocket  - Get the Wayland socket from the compositor");
 }

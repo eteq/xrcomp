@@ -22,6 +22,8 @@ use smithay::{
     },
 };
 
+use xrcomp::comms;
+
 /// Backend-specific hooks that the shared compositor state needs to call into.
 ///
 /// Every backend (udev, x11, winit) implements this, which lets everything in
@@ -82,7 +84,7 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         let space = Space::default();
 
         let socket_name = Self::init_wayland_listener(display, event_loop);
-        crate::ipc::init_ipc_listener(&event_loop.handle(), "ipcc");
+        crate::ipc::init_ipc_listener(&event_loop.handle(), &comms::get_first_free_default_socket_name());
 
         Self {
             backend_data,
