@@ -1,4 +1,7 @@
 use std::env;
+
+use interprocess::local_socket::prelude::*;
+
 use xrcomp::comms::{Command, CommandResponse};
 
 fn main() {
@@ -53,6 +56,6 @@ fn print_usage() {
 
 fn print_command_help() {
     println!("Unrecognized command. Available commands:");
-    println!("  exit                - Exit the compositor");
+    println!("  exit              - Exit the compositor");
     println!("  getwaylandsocket  - Get the Wayland socket from the compositor");
 }

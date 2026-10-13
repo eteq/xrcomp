@@ -1,6 +1,9 @@
 // Data structures, etc for IPC and control of the compositor from an external process
 
+//use crate::state::{State, Backend};
+
 use serde::{Serialize, Deserialize};
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Command {
@@ -17,4 +20,13 @@ pub struct CommandResponse {
     pub result: Option<String>,
 }
 
-//TODO: implement generic IPC mechanism using interprocess, hook into backends
+// pub fn process_message<B: Backend + 'static>(message_bytes: Vec<u8>, state: &mut State<B>) -> Result<CommandResponse, std::io::Error> {
+
+//         state.running = false;
+
+//         Ok(CommandResponse {
+//             command: Command::Exit,
+//             success: true,
+//             result: None,
+//         })
+// }
