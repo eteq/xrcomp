@@ -1,12 +1,14 @@
-use std::env;
+use std::{env, io::Write};
 
-use interprocess::local_socket::prelude::*;
+use interprocess::local_socket::{prelude::*, GenericNamespaced, Stream};
+
+use serde_json;
 
 use xrcomp::comms::{Command, CommandResponse};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
+
     match args.len() {
         2 => {
             let command: Option<Command>;
@@ -26,12 +28,24 @@ fn main() {
             }
 
             match command {
-                Some(cmd) => {  
-                    // TODO: implement IPC to send the command to the compositor and receive a response
-                    let resp = CommandResponse {
-                        command: cmd,
-                        success: true,
-                        result: Some("dummy_response".to_string()),
+
+                Some(cmd) => {
+                    let cmdstring =  serde_json::to_string(&cmd).unwrap();
+                    println!("Serialized command: {}", cmdstring);
+
+
+                    let socket_printname = "ipcc";
+                    let socket_name = socket_printname.to_ns_name::<GenericNamespaced>().expect("Getting IPC name failed");
+                    let mut conn = Stream::connect(socket_name).expect("could not connect to IPC socket");
+
+                    conn.write_all(cmdstring.as_bytes()).expect("failed to write command");
+
+                    let resp: CommandResponse = match serde_json::from_reader(conn) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            eprintln!("Failed to parse command response: {e:?}");
+                            return
+                        } 
                     };
 
                     if resp.success {
@@ -40,7 +54,7 @@ fn main() {
                             println!("Result: {}", resp.result.unwrap());
                         }
                     } else {
-                        println!("Command failed.");
+                        eprintln!("Command failed.");
                     }
                 }
                 None => print_command_help(),

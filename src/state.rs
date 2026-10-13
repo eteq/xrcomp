@@ -1,12 +1,4 @@
-use interprocess::local_socket;
-use interprocess::local_socket::{prelude::*, ListenerNonblockingMode, ListenerOptions};
-use interprocess::os::unix::uds_local_socket::Stream as UdsStream;
-
-use std::{
-    ffi::OsString,
-    io::{self, Read, Write, BufReader},
-    sync::Arc,
-};
+use std::{ffi::OsString, sync::Arc};
 
 use smithay::{
     desktop::{PopupManager, Space, Window, WindowSurfaceType},
@@ -29,11 +21,6 @@ use smithay::{
         socket::ListeningSocketSource,
     },
 };
-
-use tracing::{warn, info};
-
-//use crate::comms::process_message;
-
 
 /// Backend-specific hooks that the shared compositor state needs to call into.
 ///
@@ -95,7 +82,7 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         let space = Space::default();
 
         let socket_name = Self::init_wayland_listener(display, event_loop);
-        Self::init_ipc_listener(&event_loop.handle(), "ipcc");
+        crate::ipc::init_ipc_listener(&event_loop.handle(), "ipcc");
 
         Self {
             backend_data,
@@ -148,67 +135,6 @@ impl<BackendData: Backend + 'static> State<BackendData> {
             .unwrap();
 
         socket_name
-    }
-
-    fn init_ipc_listener(loop_handle: &LoopHandle<'static, Self>, socket_name: &str) {
-        let namespacename = socket_name.to_ns_name::<local_socket::GenericNamespaced>().expect("Failed to convert socket name to namespaced format");
-        info!("Making IPC socket: {socket_name:?},{namespacename:?}");
-        let listener = ListenerOptions::new().name(namespacename).nonblocking(ListenerNonblockingMode::Both).
-                                     create_sync().expect("Failed to create local listener for comms socket");
-        // The enum wrapper doesn't impl AsFd, but the platform-specific type inside it does,
-        // so hand that to calloop directly and get it back in the callback.
-        let listener_concrete = match listener {
-            local_socket::Listener::UdSocket(l) => l,
-        };
-
-        loop_handle
-            .insert_source(
-                Generic::new(listener_concrete, Interest::READ, Mode::Level),
-                move |_, listener, state| {
-                    loop {
-                         match listener.accept() {
-                            Ok(s) => state.add_ipc_client(s),
-                            Err(e) if e.kind() == io::ErrorKind::WouldBlock => break,
-                            Err(e) => {
-                                warn!("IPC accept failed: {e}");
-                                break;
-                            }
-                         }
-                    }
-                    Ok(PostAction::Continue)
-                },
-            )
-            .expect("Failed to init the IPC event source.");
-    }
-
-    fn add_ipc_client(&mut self, stream: UdsStream) {
-        info!("Client attempting to connect to IPC socket");
-
-        let mut read_buffer = Vec::new();
-        let _ = self.loop_handle.insert_source(
-            Generic::new(stream, Interest::READ, Mode::Level),
-            move |_, stream, state| {
-                // calloop only hands out &NoIoDrop<UdsStream> safely, but Read/Write are
-                // implemented for &UdsStream, so read/write through a shared reference.
-                let mut stream: &UdsStream = stream;
-                let mut bread = BufReader::new(stream);
-
-                loop {
-                    match bread.read(&mut read_buffer) {
-                        Ok(_) => {},
-                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => break,
-                        Err(e) => {
-                            warn!("IPC read failed: {e}");
-                            return Ok(PostAction::Remove);
-                        }
-                    }
-                }
-
-                //TODO: process message and respond via stream.write_all(&out);
-
-                Ok(PostAction::Remove) // one command per connection
-            },
-        );
     }
 
     pub fn surface_under(&self, pos: Point<f64, Logical>) -> Option<(WlSurface, Point<f64, Logical>)> {

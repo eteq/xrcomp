@@ -1,6 +1,7 @@
 mod grabs;
 mod handlers;
 mod input;
+mod ipc;
 mod render;
 mod scene;
 mod state;
