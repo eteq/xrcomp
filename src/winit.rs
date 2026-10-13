@@ -61,7 +61,7 @@ impl DmabufHandler for State<WinitData> {
     }
 }
 
-pub fn run_winit() {
+pub fn run_winit(ipc_socket_name: Option<String>) {
     let mut event_loop: EventLoop<'static, State<WinitData>> = EventLoop::try_new().unwrap();
     let display: Display<State<WinitData>> = Display::new().unwrap();
     let display_handle = display.handle();
@@ -130,7 +130,7 @@ pub fn run_winit() {
         scene: Scene::new(),
     };
 
-    let mut state = State::new(&mut event_loop, display, data);
+    let mut state = State::new(&mut event_loop, display, data, ipc_socket_name);
     let shm_formats = state.backend_data.backend.renderer().shm_formats();
     state.shm_state.update_formats(shm_formats);
     state.space.map_output(&output, (0, 0));

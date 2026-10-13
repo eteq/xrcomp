@@ -64,6 +64,7 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         event_loop: &mut EventLoop<'static, Self>,
         display: Display<Self>,
         backend_data: BackendData,
+        ipc_socket_name : Option<String>,
     ) -> Self {
         let start_time = std::time::Instant::now();
         let dh = display.handle();
@@ -84,7 +85,11 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         let space = Space::default();
 
         let socket_name = Self::init_wayland_listener(display, event_loop);
-        crate::ipc::init_ipc_listener(&event_loop.handle(), &comms::get_first_free_default_socket_name());
+        let ipc_socket_name = match ipc_socket_name{
+            Some(n) => n,
+            None => comms::get_first_free_default_socket_name()
+        };
+        crate::ipc::init_ipc_listener(&event_loop.handle(), &ipc_socket_name);
 
         Self {
             backend_data,

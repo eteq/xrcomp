@@ -59,7 +59,7 @@ impl DmabufHandler for State<X11Data> {
     }
 }
 
-pub fn run_x11() {
+pub fn run_x11(ipc_socket_name: Option<String>) {
     let mut event_loop: EventLoop<'static, State<X11Data>> = EventLoop::try_new().unwrap();
     let display: Display<State<X11Data>> = Display::new().unwrap();
     let display_handle = display.handle();
@@ -133,7 +133,7 @@ pub fn run_x11() {
         scene: Scene::new(),
     };
 
-    let mut state = State::new(&mut event_loop, display, data);
+    let mut state = State::new(&mut event_loop, display, data, ipc_socket_name);
     state
         .shm_state
         .update_formats(state.backend_data.renderer.shm_formats());

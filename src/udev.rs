@@ -94,7 +94,7 @@ impl DmabufHandler for State<UdevData> {
     }
 }
 
-pub fn run_udev() {
+pub fn run_udev(ipc_socket_name: Option<String>) {
     let mut event_loop: EventLoop<'static, State<UdevData>> = EventLoop::try_new().unwrap();
     let display: Display<State<UdevData>> = Display::new().unwrap();
     let display_handle = display.handle();
@@ -170,7 +170,7 @@ pub fn run_udev() {
         scene: Scene::new(),
     };
 
-    let mut state = State::new(&mut event_loop, display, data);
+    let mut state = State::new(&mut event_loop, display, data, ipc_socket_name);
     state
         .shm_state
         .update_formats(state.backend_data.renderer.shm_formats());
