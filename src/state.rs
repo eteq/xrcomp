@@ -57,6 +57,9 @@ pub struct State<BackendData: Backend + 'static> {
     pub data_device_state: DataDeviceState,
 
     pub seat: Seat<Self>,
+
+    #[allow(dead_code)]
+    pub ipc_socket_name: String,
 }
 
 impl<BackendData: Backend + 'static> State<BackendData> {
@@ -111,6 +114,8 @@ impl<BackendData: Backend + 'static> State<BackendData> {
             data_device_state,
 
             seat,
+
+            ipc_socket_name,
         }
     }
 
