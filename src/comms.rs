@@ -8,7 +8,8 @@ use interprocess::local_socket::{prelude::*, GenericNamespaced, Stream};
 #[derive(Serialize, Deserialize, Debug, Subcommand)]
 pub enum Command {
     Exit,
-    GetWaylandSocket
+    GetWaylandSocket,
+    RunCommand {cmd: String},
 }
 
 

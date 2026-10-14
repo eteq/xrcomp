@@ -96,7 +96,7 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
             }
         };
 
-        let response = match command {
+        let response = match &command {
             Command::Exit => {
                 info!("IPC command: Exit");
                 state.running = false;
@@ -113,6 +113,23 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
                     command,
                     success: true,
                     result: Some(socket_name.to_string_lossy().to_string()),
+                }
+            }
+            Command::RunCommand{cmd} => {
+                let spawned = std::process::Command::new(cmd.clone()).spawn();
+                let (success, result) = match spawned {
+                    Ok(c) => (true, Some(c.id().to_string())),
+                    Err(e) => {
+                        let errmsg = format!("Failed to run command \"{cmd}\" due to error: {e:?}");
+                        warn!(errmsg);
+                        (false, Some(errmsg.to_string()))
+                    }
+                };
+                
+                CommandResponse {
+                    command,
+                    success,
+                    result,
                 }
             }
         };        
