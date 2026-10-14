@@ -68,14 +68,6 @@ fn main() {
     }
 }
 
-// fn print_usage() {
-//     println!("USAGE: xrcomp [udev | x11 | winit]");
-//     println!();
-//     println!("  udev   Run on a raw tty using udev/DRM/libinput (default, requires a seat).");
-//     println!("  x11    Run nested in an existing X11 session. Intended for development.");
-//     println!("  winit  Run nested in an existing Wayland (or x11) session using winit. Intended for development.");
-// }
-
 fn init_logging() {
     if let Ok(env_filter) = tracing_subscriber::EnvFilter::try_from_default_env() {
         tracing_subscriber::fmt().with_env_filter(env_filter).init();
@@ -83,4 +75,3 @@ fn init_logging() {
         tracing_subscriber::fmt().init();
     }
 }
-
