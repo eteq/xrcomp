@@ -7,8 +7,11 @@ use interprocess::local_socket::{prelude::*, GenericNamespaced, Stream};
 
 #[derive(Serialize, Deserialize, Debug, Subcommand)]
 pub enum Command {
+    /// Have xrcomp stop gracefully
     Exit,
+    /// Return the socket name of the wayland socket for this xrcomp
     GetWaylandSocket,
+    /// Run the provided command as a child of xrcomp
     RunCommand {cmd: String},
 }
 
