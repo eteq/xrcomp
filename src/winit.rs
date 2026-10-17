@@ -19,7 +19,7 @@ use smithay::{
 use tracing::{error, info, warn};
 
 use crate::{
-    render::{CLEAR_COLOR, Cursor, output_elements},
+    render::{CLEAR_COLOR, collect_output_elements},
     scene::Scene,
     state::{Backend, State},
 };
@@ -31,7 +31,6 @@ pub struct WinitData {
     damage_tracker: OutputDamageTracker,
     dmabuf_state: DmabufState,
     _dmabuf_global: DmabufGlobal,
-    cursor: Cursor,
     scene: Scene,
 }
 
@@ -126,7 +125,6 @@ pub fn run_winit(ipc_socket_name: Option<String>) {
         damage_tracker,
         dmabuf_state,
         _dmabuf_global: dmabuf_global,
-        cursor: Cursor::new(),
         scene: Scene::new(),
     };
 
@@ -185,7 +183,6 @@ fn render_frame(state: &mut State<WinitData>, output: &Output) -> bool {
     let WinitData {
         backend,
         damage_tracker,
-        cursor,
         scene,
         ..
     } = &mut state.backend_data;
@@ -200,9 +197,9 @@ fn render_frame(state: &mut State<WinitData>, output: &Output) -> bool {
         0
     };
 
-    let cursor_element = cursor.render_element(cursor_pos, scale);
+    let cursor_element = state.cursor.build_render_element(cursor_pos, scale);
     let scene_element = scene.prepare(backend.renderer(), &state.space, output);
-    let elements = output_elements(cursor_element, scene_element);
+    let elements = collect_output_elements(cursor_element, scene_element);
 
     let render_res = {
         let (renderer, mut fb) = match backend.bind() {

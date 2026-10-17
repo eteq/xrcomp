@@ -1,18 +1,13 @@
 use std::{ffi::OsString, sync::Arc};
 
 use smithay::{
-    desktop::{PopupManager, Space, Window, WindowSurfaceType},
-    input::{Seat, SeatState, pointer::PointerHandle},
-    reexports::{
-        calloop::{EventLoop, Interest, LoopHandle, Mode, PostAction, generic::Generic},
-        wayland_server::{
+    desktop::{PopupManager, Space, Window, WindowSurfaceType}, input::{Seat, SeatState, pointer::PointerHandle}, reexports::{
+        calloop::{EventLoop, Interest, LoopHandle, Mode, PostAction, generic::Generic}, wayland_server::{
             Display, DisplayHandle,
             backend::{ClientData, ClientId, DisconnectReason},
             protocol::wl_surface::WlSurface,
-        },
-    },
-    utils::{Logical, Point},
-    wayland::{
+        }, 
+    }, utils::{Logical, Point}, wayland::{
         compositor::{CompositorClientState, CompositorState},
         output::OutputManagerState,
         selection::data_device::DataDeviceState,
@@ -21,6 +16,8 @@ use smithay::{
         socket::ListeningSocketSource,
     },
 };
+
+use crate::render::Cursor;
 
 use xrcomp::comms;
 
@@ -58,6 +55,8 @@ pub struct State<BackendData: Backend + 'static> {
 
     pub seat: Seat<Self>,
 
+    pub cursor: Cursor,
+
     #[allow(dead_code)]
     pub ipc_socket_name: String,
 }
@@ -84,6 +83,8 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         let mut seat: Seat<Self> = seat_state.new_wl_seat(&dh, seat_name);
         seat.add_keyboard(Default::default(), 200, 25).unwrap();
         seat.add_pointer();
+
+        let cursor = Cursor::new();
 
         let space = Space::default();
 
@@ -114,6 +115,8 @@ impl<BackendData: Backend + 'static> State<BackendData> {
             data_device_state,
 
             seat,
+
+            cursor,
 
             ipc_socket_name,
         }

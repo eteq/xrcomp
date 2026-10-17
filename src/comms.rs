@@ -12,7 +12,14 @@ pub enum Command {
     /// Return the socket name of the wayland socket for this xrcomp
     GetWaylandSocket,
     /// Run the provided command as a child of xrcomp
-    RunCommand {cmd: String},
+    RunClientCommand {cmd: String},
+    /// Set the cursor box size and/or color
+    SetCursor {
+                /// The size of the cursor box
+                size: Option<u32>, 
+                /// The color as a css-style string or named color
+                color: Option<String> 
+    }
 }
 
 

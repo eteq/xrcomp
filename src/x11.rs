@@ -22,7 +22,7 @@ use smithay::{
 use tracing::{error, info, warn};
 
 use crate::{
-    render::{CLEAR_COLOR, Cursor, output_elements},
+    render::{CLEAR_COLOR, collect_output_elements},
     scene::Scene,
     state::{Backend, State},
 };
@@ -35,7 +35,6 @@ pub struct X11Data {
     damage_tracker: OutputDamageTracker,
     dmabuf_state: DmabufState,
     _dmabuf_global: DmabufGlobal,
-    cursor: Cursor,
     scene: Scene,
 }
 
@@ -129,7 +128,6 @@ pub fn run_x11(ipc_socket_name: Option<String>) {
         damage_tracker,
         dmabuf_state,
         _dmabuf_global: dmabuf_global,
-        cursor: Cursor::new(),
         scene: Scene::new(),
     };
 
@@ -141,7 +139,7 @@ pub fn run_x11(ipc_socket_name: Option<String>) {
 
     unsafe { std::env::set_var("WAYLAND_DISPLAY", &state.socket_name) };
 
-    let output_clone = output.clone();
+    let output_clone = output.clone(); // Non-obvious, but Output is an Arc-like thingie so this clone is just the reference count increasing
     event_loop
         .handle()
         .insert_source(backend, move |event, _, state| match event {
@@ -213,9 +211,9 @@ fn render_frame(state: &mut State<X11Data>, output: &Output) -> bool {
         }
     };
 
-    let cursor_element = backend_data.cursor.render_element(cursor_pos, scale);
+    let cursor_element = state.cursor.build_render_element(cursor_pos, scale);
 
-    let elements = output_elements(cursor_element, scene_element);
+    let elements = collect_output_elements(cursor_element, scene_element);
 
     let render_res = backend_data.damage_tracker.render_output(
         &mut backend_data.renderer,

@@ -1,5 +1,7 @@
 // Compositor-side IPC: listens on the control socket and acts on commands from xrcompctl.
 
+use csscolorparser;
+
 use interprocess::local_socket;
 use interprocess::local_socket::{prelude::*, ListenerNonblockingMode, ListenerOptions};
 use interprocess::os::unix::uds_local_socket::Stream as UdsStream;
@@ -96,28 +98,24 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
             }
         };
 
-        let response = match &command {
+        let mut result = None;
+        let mut success = false;
+
+        match &command {
             Command::Exit => {
                 info!("IPC command: Exit");
                 state.running = false;
-                CommandResponse {
-                    command,
-                    success: true,
-                    result: None,
-                }
             }
             Command::GetWaylandSocket => {
                 info!("IPC command: GetWaylandSocket");
                 let socket_name = state.socket_name.clone();
-                CommandResponse {
-                    command,
-                    success: true,
-                    result: Some(socket_name.to_string_lossy().to_string()),
-                }
+
+                success = true;
+                result = Some(socket_name.to_string_lossy().to_string());
             }
-            Command::RunCommand{cmd} => {
+            Command::RunClientCommand{cmd} => {
                 let spawned = std::process::Command::new(cmd.clone()).spawn();
-                let (success, result) = match spawned {
+                (success, result) = match spawned {
                     Ok(c) => (true, Some(c.id().to_string())),
                     Err(e) => {
                         let errmsg = format!("Failed to run command \"{cmd}\" due to error: {e:?}");
@@ -125,14 +123,28 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
                         (false, Some(errmsg.to_string()))
                     }
                 };
-                
-                CommandResponse {
-                    command,
-                    success,
-                    result,
+            }
+            Command::SetCursor { color , size } => {
+                if size.is_some() {
+                    state.cursor.set_size(size.unwrap());
+                    success = true;
                 }
+
+                if color.is_some() {
+                    let colorstr = color.as_ref().unwrap();
+                    match csscolorparser::parse(&colorstr) {
+                        Ok(parsed_color) => {
+                            state.cursor.set_color(parsed_color.to_linear_rgba());
+                            success = true;
+                        }
+                        Err(e) => {
+                            success = false;
+                            result = Some(format!("Failed to parse color \"{colorstr}\": {e}"));
+                        }
+                    }
+                }                
             }
         };        
 
-        Ok(response)
+        Ok(CommandResponse {command, success, result})
 }

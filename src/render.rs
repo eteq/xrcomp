@@ -27,7 +27,7 @@ smithay::backend::renderer::element::render_elements! {
 }
 
 /// The elements for one output frame, front to back: the cursor on top of the scene.
-pub fn output_elements(
+pub fn collect_output_elements(
     cursor: SolidColorRenderElement,
     scene: Option<crate::scene::SceneElement>,
 ) -> Vec<OutputElement> {
@@ -50,12 +50,21 @@ impl Cursor {
         }
     }
 
-    pub fn render_element(
+    pub fn build_render_element(
         &self,
         location: Point<i32, Physical>,
         scale: impl Into<smithay::utils::Scale<f64>>,
     ) -> SolidColorRenderElement {
         SolidColorRenderElement::from_buffer(&self.buffer, location, scale, 1.0, Kind::Cursor)
+    }
+
+    pub fn set_color(&mut self, color: impl Into<Color32F>) {
+        self.buffer.set_color(color);
+    }
+
+    pub fn set_size(&mut self, size: u32) {
+        let isize = (size as i32, size as i32);
+        self.buffer.update(isize, self.buffer.color());
     }
 }
 
