@@ -1,10 +1,8 @@
 use smithay::{
     backend::input::{
-        AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent,
-        KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent, PointerMotionEvent,
-    },
-    input::{
-        keyboard::FilterResult,
+        AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent, PointerMotionEvent,
+    }, input::{
+        keyboard::{FilterResult, Keysym},
         pointer::{AxisFrame, ButtonEvent, MotionEvent, RelativeMotionEvent},
     },
     reexports::wayland_server::protocol::wl_surface::WlSurface,
@@ -19,15 +17,31 @@ impl<BackendData: Backend + 'static> State<BackendData> {
             InputEvent::Keyboard { event, .. } => {
                 let serial = SERIAL_COUNTER.next_serial();
                 let time = Event::time(&event);
+                let press_state = event.state();
 
-                self.seat.get_keyboard().unwrap().input::<(), _>(
+                let action = self.seat.get_keyboard().unwrap().input::<CompositorAction, _>(
                     self,
                     event.key_code(),
-                    event.state(),
+                    press_state,
                     serial,
                     time,
-                    |_, _, _| FilterResult::Forward,
+                    |state, modifiers, handle| {
+                        if press_state == KeyState::Pressed && state.config.compositor_modifier.matches_state(modifiers) {
+                            if handle.modified_sym() == Keysym::from_char(state.config.quit_focused_window_key) {
+                                FilterResult::Intercept(CompositorAction::QuitFocusedWindow)
+                            } else {
+                                FilterResult::Forward
+                            }
+                        } else {
+                                FilterResult::Forward
+
+                        }
+                    },
                 );
+
+                if let Some(action) = action {
+                    action.do_action(self);
+                }
             }
             // Relative motion: emitted by real pointer devices (mice, trackpads) through
             // libinput on the udev backend. There is no absolute position, so we accumulate
@@ -172,4 +186,28 @@ impl<BackendData: Backend + 'static> State<BackendData> {
             _ => {}
         }
     }
+}
+
+enum CompositorAction {
+    QuitFocusedWindow,
+}
+
+impl CompositorAction {
+    fn do_action<B: Backend>(&self, state: &mut State<B>) {
+        match self {
+            CompositorAction::QuitFocusedWindow => { let _ = quit_focused_window(state); },
+        }
+    }
+}
+
+fn quit_focused_window<B: Backend>(state: &mut State<B>) -> Result<(), ()> {
+    if let Some(focused) = state.seat.get_keyboard().unwrap().current_focus() {
+        if let Some(window) = state.space.elements().find(|w| w.toplevel().unwrap().wl_surface() == &focused) {
+            if let Some(toplevel) = window.clone().toplevel() {
+                toplevel.send_close();
+                return Ok(())
+            }
+        } 
+    }
+    Err(())
 }

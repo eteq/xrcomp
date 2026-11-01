@@ -3,13 +3,15 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct XrcompConfig {
-    compositor_modifier: ModifierKey,
+    pub compositor_modifier: ModifierKey,
+    pub quit_focused_window_key: char,
 }
 
 impl Default for XrcompConfig {
     fn default() -> Self {
         Self {
             compositor_modifier: ModifierKey::Super,
+            quit_focused_window_key: 'w',
         }
     }
 }
@@ -20,6 +22,19 @@ pub enum ModifierKey {
     Alt,
     Shift,
     Super,
+    Nomod
+}
+
+impl  ModifierKey {
+    pub fn matches_state(&self, modifiers: &smithay::input::keyboard::ModifiersState) -> bool {
+        match self {
+            ModifierKey::Ctrl => modifiers.ctrl && !modifiers.alt && !modifiers.shift && !modifiers.logo,
+            ModifierKey::Alt => !modifiers.ctrl && modifiers.alt && !modifiers.shift && !modifiers.logo,
+            ModifierKey::Shift => !modifiers.ctrl && !modifiers.alt && modifiers.shift && !modifiers.logo,
+            ModifierKey::Super => !modifiers.ctrl && !modifiers.alt && !modifiers.shift && modifiers.logo,
+            ModifierKey::Nomod => !modifiers.ctrl && !modifiers.alt && !modifiers.shift && !modifiers.logo,
+        }
+    }
 }
 
 pub fn load_config() -> Result<XrcompConfig, confy::ConfyError> {
