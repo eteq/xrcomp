@@ -13,6 +13,7 @@ use smithay::reexports::calloop::{Interest, LoopHandle, Mode, PostAction, generi
 use tracing::{warn, info};
 
 use xrcomp::comms::{Command, CommandResponse};
+use xrcomp::conf::{write_current_conf, get_conf_path};
 
 use crate::state::{Backend, State};
 
@@ -143,6 +144,31 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
                         }
                     }
                 }                
+            }
+            Command::GetConfPath => {
+                info!("IPC command: GetConfPath");
+                match get_conf_path() {
+                    Ok(path) => {
+                        success = true;
+                        result = Some(path.to_string_lossy().to_string());
+                    }
+                    Err(e) => {
+                        success = false;
+                        result = Some(format!("Failed to get configuration path: {e}"));
+                    }
+                }
+            }
+            Command::SaveConfFile => {
+                info!("IPC command: SaveConfFile");
+                match write_current_conf() {
+                    Ok(_) => {
+                        success = true;
+                    }
+                    Err(e) => {
+                        success = false;
+                        result = Some(format!("Failed to write current configuration: {e}"));
+                    }
+                }
             }
         };        
 

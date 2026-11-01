@@ -19,7 +19,11 @@ pub enum Command {
                 size: Option<u32>, 
                 /// The color as a css-style string or named color
                 color: Option<String> 
-    }
+    },
+    /// Return the name of the current configuration file
+    GetConfPath,
+    /// Save out the current configuration to the standard location
+    SaveConfFile
 }
 
 
