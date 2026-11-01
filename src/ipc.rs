@@ -13,7 +13,7 @@ use smithay::reexports::calloop::{Interest, LoopHandle, Mode, PostAction, generi
 use tracing::{warn, info};
 
 use xrcomp::comms::{Command, CommandResponse};
-use xrcomp::conf::{write_current_conf, get_conf_path};
+use xrcomp::conf::{write_config, get_config_path};
 
 use crate::state::{Backend, State};
 
@@ -147,7 +147,7 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
             }
             Command::GetConfPath => {
                 info!("IPC command: GetConfPath");
-                match get_conf_path() {
+                match get_config_path() {
                     Ok(path) => {
                         success = true;
                         result = Some(path.to_string_lossy().to_string());
@@ -160,7 +160,7 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
             }
             Command::SaveConfFile => {
                 info!("IPC command: SaveConfFile");
-                match write_current_conf() {
+                match write_config(&state.config) {
                     Ok(_) => {
                         success = true;
                     }

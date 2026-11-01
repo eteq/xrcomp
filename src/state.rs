@@ -20,6 +20,7 @@ use smithay::{
 use crate::render::Cursor;
 
 use xrcomp::comms;
+use xrcomp::conf;
 
 /// Backend-specific hooks that the shared compositor state needs to call into.
 ///
@@ -59,6 +60,8 @@ pub struct State<BackendData: Backend + 'static> {
 
     #[allow(dead_code)]
     pub ipc_socket_name: String,
+
+    pub config: conf::XrcompConfig,
 }
 
 impl<BackendData: Backend + 'static> State<BackendData> {
@@ -69,6 +72,9 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         ipc_socket_name : Option<String>,
     ) -> Self {
         let start_time = std::time::Instant::now();
+
+        let config = conf::load_config().expect("Failed to load configuration");
+
         let dh = display.handle();
 
         let compositor_state = CompositorState::new::<Self>(&dh);
@@ -119,6 +125,7 @@ impl<BackendData: Backend + 'static> State<BackendData> {
             cursor,
 
             ipc_socket_name,
+            config,
         }
     }
 
