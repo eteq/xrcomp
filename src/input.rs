@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use smithay::{
     backend::input::{
         AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent, PointerMotionEvent,
@@ -29,6 +31,8 @@ impl<BackendData: Backend + 'static> State<BackendData> {
                         if press_state == KeyState::Pressed && state.config.compositor_modifier.matches_state(modifiers) {
                             if handle.modified_sym() == Keysym::from_char(state.config.quit_focused_window_key) {
                                 FilterResult::Intercept(CompositorAction::QuitFocusedWindow)
+                            } else if handle.modified_sym() == Keysym::from_char(state.config.quit_compositor_key) {
+                                FilterResult::Intercept(CompositorAction::QuitCompositor)
                             } else {
                                 FilterResult::Forward
                             }
@@ -190,12 +194,14 @@ impl<BackendData: Backend + 'static> State<BackendData> {
 
 enum CompositorAction {
     QuitFocusedWindow,
+    QuitCompositor,
 }
 
 impl CompositorAction {
     fn do_action<B: Backend>(&self, state: &mut State<B>) {
         match self {
             CompositorAction::QuitFocusedWindow => { let _ = quit_focused_window(state); },
+            CompositorAction::QuitCompositor => { let _ = quit_compositor(state); },
         }
     }
 }
@@ -210,4 +216,21 @@ fn quit_focused_window<B: Backend>(state: &mut State<B>) -> Result<(), ()> {
         } 
     }
     Err(())
+}
+
+fn quit_compositor<B: Backend>(state: &mut State<B>) -> Result<(), ()> {
+    if state.config.quit_compositor_key_timeout_ms == 0 {
+        state.running = false;
+        return Ok(());
+    }
+
+    if let Some(lastpress) = state.quit_key_lastpress {
+        if lastpress.elapsed().as_millis() < state.config.quit_compositor_key_timeout_ms as u128 {
+            state.running = false;
+        }
+    }
+
+    state.quit_key_lastpress = Some(Instant::now());
+
+    Ok(())
 }

@@ -1,4 +1,4 @@
-use std::{ffi::OsString, sync::Arc};
+use std::{ffi::OsString, sync::Arc, time::Instant};
 
 use smithay::{
     desktop::{PopupManager, Space, Window, WindowSurfaceType}, input::{Seat, SeatState, pointer::PointerHandle}, reexports::{
@@ -62,6 +62,7 @@ pub struct State<BackendData: Backend + 'static> {
     pub ipc_socket_name: String,
 
     pub config: conf::XrcompConfig,
+    pub quit_key_lastpress: Option<Instant>,
 }
 
 impl<BackendData: Backend + 'static> State<BackendData> {
@@ -71,7 +72,7 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         backend_data: BackendData,
         ipc_socket_name : Option<String>,
     ) -> Self {
-        let start_time = std::time::Instant::now();
+        let start_time = Instant::now();
 
         let config = conf::load_config().expect("Failed to load configuration");
 
@@ -126,6 +127,7 @@ impl<BackendData: Backend + 'static> State<BackendData> {
 
             ipc_socket_name,
             config,
+            quit_key_lastpress: None,
         }
     }
 

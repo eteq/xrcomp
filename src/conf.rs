@@ -5,6 +5,8 @@ use serde::{Serialize, Deserialize};
 pub struct XrcompConfig {
     pub compositor_modifier: ModifierKey,
     pub quit_focused_window_key: char,
+    pub quit_compositor_key: char,
+    pub quit_compositor_key_timeout_ms: u32,
 }
 
 impl Default for XrcompConfig {
@@ -12,6 +14,8 @@ impl Default for XrcompConfig {
         Self {
             compositor_modifier: ModifierKey::Super,
             quit_focused_window_key: 'w',
+            quit_compositor_key: 'x',
+            quit_compositor_key_timeout_ms: 1000,
         }
     }
 }
