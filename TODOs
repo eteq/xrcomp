@@ -12,7 +12,7 @@ These are an ongoing incomplete and non-exclusiuve list of known items necessary
 * Cursor options?
 * 3d hit-detection/ray casting
 * Implement glasses-based orientation tracking
-* Eliminate Surface<Window> in input stack
+* Eliminate `Surface<Window>` in input stack
 * eliminate none rendering
 * 3d curved rendering
 * 2d flat rendering (might be a sub-type of 3d flat?)
