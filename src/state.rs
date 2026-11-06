@@ -1,4 +1,4 @@
-use std::{ffi::OsString, sync::Arc, time::Instant};
+use std::{ffi::OsString, sync::Arc, time::Instant, mem, error};
 
 use smithay::{
     desktop::{PopupManager, Space, Window, WindowSurfaceType}, input::{Seat, SeatState, pointer::PointerHandle}, reexports::{
@@ -16,6 +16,7 @@ use smithay::{
         socket::ListeningSocketSource,
     },
 };
+use tracing::{info, warn};
 
 use crate::render_helpers::Cursor;
 
@@ -91,7 +92,9 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         seat.add_keyboard(Default::default(), 200, 25).unwrap();
         seat.add_pointer();
 
-        let cursor = Cursor::new();
+        let mut cursor = Cursor::new();
+        cursor.set_color_str(&config.cursor_color).expect("Failed to set cursor color from config");
+        cursor.set_size(config.cursor_size);
 
         let space = Space::default();
 
@@ -101,6 +104,25 @@ impl<BackendData: Backend + 'static> State<BackendData> {
             None => comms::get_first_free_default_socket_name()
         };
         crate::ipc::init_ipc_listener(&event_loop.handle(), &ipc_socket_name);
+
+        // try to save the config file if it is missing, but don't crash if we can't
+        match conf::get_config_path() {
+            Ok(path) => {
+                match path.as_path().try_exists() {
+                    Ok(exists) => {
+                        if exists {
+                            if let Err(e) = conf::write_config(&config) {
+                                warn!("Failed to write missing config file: {}", e);
+                            } else {
+                                info!("Successfully wrote missing config file to {}", path.display());
+                            }
+                        }
+                    },
+                    Err(e) => warn!("Failed to check if config path exists: {}", e)
+                }
+            },
+            Err(e) => warn!("Failed to get config path so couldn't auto-save config: {}", e),
+        }
 
         Self {
             backend_data,
@@ -183,6 +205,41 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         let x = pos.x.clamp(geo.loc.x as f64, (geo.loc.x + geo.size.w) as f64);
         let y = pos.y.clamp(geo.loc.y as f64, (geo.loc.y + geo.size.h) as f64);
         (x, y).into()
+    }
+
+    /// Reload the configuration from the configuration file and apply it.
+    pub fn reload_config(&mut self)  -> Result<(), Box<dyn error::Error>> {
+        let new_config = conf::load_config()?;
+        match self.update_config(new_config) {
+            Ok(_) => Ok(()),
+            Err(mut errs) => Err(errs.remove(0)) // just return the first
+        }
+    }
+
+    /// This updates the current configuration with the new configuration,
+    /// and does any state-jiggering that's needed to apply it
+    fn update_config(&mut self, new_config: conf::XrcompConfig) -> Result<(), Vec<Box<dyn error::Error>>>{
+        let mut errs: Vec<Box<dyn error::Error>> = Vec::new();
+        let old_config = mem::replace(&mut self.config, new_config);
+        if old_config.cursor_size != self.config.cursor_size {
+            self.cursor.set_size(self.config.cursor_size);
+        }
+
+        if old_config.cursor_color != self.config.cursor_color {
+            if let Err(e) = self.cursor.set_color_str(&self.config.cursor_color) {
+                errs.push(Box::new(e));
+            }
+        }
+
+        if errs.len() > 0 {
+            warn!("Failed to apply some configuration changes! Attempting to revert");
+            if let Err(_) = self.update_config(old_config) {
+                panic!("Failed to revert configuration changes!");
+            }
+            Err(errs) // shows only the top error right now
+        } else {
+            Ok(())
+        }
     }
 }
 

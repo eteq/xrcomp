@@ -13,17 +13,12 @@ pub enum Command {
     GetWaylandSocket,
     /// Run the provided command as a child of xrcomp
     RunClientCommand {cmd: String},
-    /// Set the cursor box size and/or color
-    SetCursor {
-                /// The size of the cursor box
-                size: Option<u32>, 
-                /// The color as a css-style string or named color
-                color: Option<String> 
-    },
     /// Return the name of the current configuration file
-    GetConfPath,
+    GetConfigPath,
     /// Save out the current configuration to the standard location
-    SaveConfFile
+    SaveConfigFile,
+    /// Reload the current configuration file
+    ReloadConfigFile,
 }
 
 

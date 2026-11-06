@@ -1,23 +1,23 @@
 These are an ongoing incomplete and non-exclusiuve list of known items necessary for an alpha-level release.  Once that has been acheived this should be deleted and replaced by github issues.
 
 
-* Status text
-* Change to config-file-mainly instead of ipc for relevant state
-* Arrangement modes - start with only none and 3d flat
-* Implement 3d window arrangement - units are "native window/client pixels"
-* Focal plane and convergence plane and eyesep options
-* Implement stereo SBS rendering
-* Grab-and-Move window
-* Window resize
-* Cursor options?
-* 3d hit-detection/ray casting
-* Implement glasses-based orientation tracking
-* Eliminate `Surface<Window>` in input stack
-* eliminate none rendering
-* 3d curved rendering
-* 2d flat rendering (might be a sub-type of 3d flat?)
-* Full Screen rendering
-* auto config-updating/saving?
-* tiling?
-* Implement alternative stereo approaches?
-* static low-motion mode w/ only-damaged buffer updates? (depends on performance targets for alpha)
+- [ ] Status text
+- [x] Change to config-file-mainly instead of ipc for relevant state
+- [ ] Arrangement modes - start with only none and 3d flat
+- [ ] Implement 3d window arrangement - units are "native window/client pixels"
+- [ ] Focal plane and convergence plane and eyesep options
+- [ ] Implement stereo SBS rendering
+- [ ] Grab-and-Move window
+- [ ] Window resize
+- [ ] Cursor options?
+- [ ] 3d hit-detection/ray casting
+- [ ] Implement glasses-based orientation tracking
+- [ ] Eliminate `Surface<Window>` in input stack
+- [ ] eliminate none rendering
+- [ ] 3d curved rendering
+- [ ] 2d flat rendering (might be a sub-type of 3d flat?)
+- [ ] Full Screen rendering
+- [ ] auto config-updating/saving?
+- [ ] tiling?
+- [ ] Implement alternative stereo approaches?
+- [ ] static low-motion mode w/ only-damaged buffer updates? (depends on performance targets for alpha)

@@ -1,7 +1,5 @@
 // Compositor-side IPC: listens on the control socket and acts on commands from xrcompctl.
 
-use csscolorparser;
-
 use interprocess::local_socket;
 use interprocess::local_socket::{prelude::*, ListenerNonblockingMode, ListenerOptions};
 use interprocess::os::unix::uds_local_socket::Stream as UdsStream;
@@ -125,28 +123,8 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
                     }
                 };
             }
-            Command::SetCursor { color , size } => {
-                if size.is_some() {
-                    state.cursor.set_size(size.unwrap());
-                    success = true;
-                }
-
-                if color.is_some() {
-                    let colorstr = color.as_ref().unwrap();
-                    match csscolorparser::parse(&colorstr) {
-                        Ok(parsed_color) => {
-                            state.cursor.set_color(parsed_color.to_linear_rgba());
-                            success = true;
-                        }
-                        Err(e) => {
-                            success = false;
-                            result = Some(format!("Failed to parse color \"{colorstr}\": {e}"));
-                        }
-                    }
-                }                
-            }
-            Command::GetConfPath => {
-                info!("IPC command: GetConfPath");
+            Command::GetConfigPath => {
+                info!("IPC command: GetConfigPath");
                 match get_config_path() {
                     Ok(path) => {
                         success = true;
@@ -158,8 +136,8 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
                     }
                 }
             }
-            Command::SaveConfFile => {
-                info!("IPC command: SaveConfFile");
+            Command::SaveConfigFile => {
+                info!("IPC command: SaveConfigFile");
                 match write_config(&state.config) {
                     Ok(_) => {
                         success = true;
@@ -167,6 +145,18 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
                     Err(e) => {
                         success = false;
                         result = Some(format!("Failed to write current configuration: {e}"));
+                    }
+                }
+            }
+            Command::ReloadConfigFile => {
+                info!("IPC command: ReloadConfigFile");
+                match state.reload_config() {
+                    Ok(_) => {
+                        success = true;
+                    }
+                    Err(e) => {
+                        success = false;
+                        result = Some(format!("Failed to reload configuration: {e}"));
                     }
                 }
             }

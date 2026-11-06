@@ -44,8 +44,8 @@ impl Cursor {
     pub fn new() -> Self {
         Self {
             buffer: smithay::backend::renderer::element::solid::SolidColorBuffer::new(
-                (10, 10),
-                [0.9, 0.3, 0.1, 1.0],
+                (1, 1),
+                [1.0, 0.0, 0.0, 1.0],
             ),
         }
     }
@@ -56,6 +56,16 @@ impl Cursor {
         scale: impl Into<smithay::utils::Scale<f64>>,
     ) -> SolidColorRenderElement {
         SolidColorRenderElement::from_buffer(&self.buffer, location, scale, 1.0, Kind::Cursor)
+    }
+
+    pub fn set_color_str(&mut self, colorstr: &String) -> Result<(), csscolorparser::ParseColorError> {
+        match csscolorparser::parse(colorstr) {
+            Ok(parsed_color) => {
+                self.set_color(parsed_color.to_linear_rgba());
+                Ok(())
+            },
+            Err(e) => Err(e)
+        }
     }
 
     pub fn set_color(&mut self, color: impl Into<Color32F>) {
