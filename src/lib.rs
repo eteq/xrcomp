@@ -1,2 +1,2 @@
-pub mod comms;
+pub mod ipc;
 pub mod conf;

@@ -1,7 +1,7 @@
 mod grabs;
 mod handlers;
 mod input;
-mod ipc;
+mod compositor_ipc;
 mod render_helpers;
 mod scene;
 mod state;

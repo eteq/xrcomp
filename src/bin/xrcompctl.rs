@@ -6,7 +6,7 @@ use interprocess::local_socket::{prelude::*, GenericNamespaced, Stream};
 
 use serde_json;
 
-use xrcomp::comms::{Command, CommandResponse, get_default_socket_name};
+use xrcomp::ipc::{Command, CommandResponse, get_default_socket_name};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]

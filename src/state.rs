@@ -19,8 +19,9 @@ use smithay::{
 use tracing::{info, warn};
 
 use crate::render_helpers::Cursor;
+use crate::compositor_ipc::init_ipc_listener;
 
-use xrcomp::comms;
+use xrcomp::ipc::get_first_free_default_socket_name;
 use xrcomp::conf;
 
 /// Backend-specific hooks that the shared compositor state needs to call into.
@@ -101,9 +102,9 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         let socket_name = Self::init_wayland_listener(display, event_loop);
         let ipc_socket_name = match ipc_socket_name{
             Some(n) => n,
-            None => comms::get_first_free_default_socket_name()
+            None => get_first_free_default_socket_name()
         };
-        crate::ipc::init_ipc_listener(&event_loop.handle(), &ipc_socket_name);
+        init_ipc_listener(&event_loop.handle(), &ipc_socket_name);
 
         // try to save the config file if it is missing, but don't crash if we can't
         match conf::get_config_path() {
