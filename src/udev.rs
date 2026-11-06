@@ -46,7 +46,7 @@ use smithay_drm_extras::drm_scanner::{DrmScanEvent, DrmScanner};
 use tracing::{error, info, warn};
 
 use crate::{
-    render::{CLEAR_COLOR, OutputElement, collect_output_elements, output_scale},
+    render_helpers::{CLEAR_COLOR, OutputElement, collect_output_elements, output_scale},
     scene::Scene,
     state::{Backend, State},
 };

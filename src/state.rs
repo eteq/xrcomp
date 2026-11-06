@@ -17,7 +17,7 @@ use smithay::{
     },
 };
 
-use crate::render::Cursor;
+use crate::render_helpers::Cursor;
 
 use xrcomp::comms;
 use xrcomp::conf;

@@ -2,7 +2,7 @@ mod grabs;
 mod handlers;
 mod input;
 mod ipc;
-mod render;
+mod render_helpers;
 mod scene;
 mod state;
 

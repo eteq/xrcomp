@@ -19,7 +19,7 @@ use smithay::{
 use tracing::{error, info, warn};
 
 use crate::{
-    render::{CLEAR_COLOR, collect_output_elements},
+    render_helpers::{CLEAR_COLOR, collect_output_elements},
     scene::Scene,
     state::{Backend, State},
 };
