@@ -33,6 +33,8 @@ impl<BackendData: Backend + 'static> State<BackendData> {
                                 FilterResult::Intercept(CompositorAction::QuitFocusedWindow)
                             } else if handle.modified_sym() == Keysym::from_char(state.config.quit_compositor_key) {
                                 FilterResult::Intercept(CompositorAction::QuitCompositor)
+                            } else if handle.modified_sym() == Keysym::from_char(state.config.reload_config_key) {
+                                FilterResult::Intercept(CompositorAction::ReloadConfig)
                             } else {
                                 FilterResult::Forward
                             }
@@ -195,6 +197,7 @@ impl<BackendData: Backend + 'static> State<BackendData> {
 enum CompositorAction {
     QuitFocusedWindow,
     QuitCompositor,
+    ReloadConfig,
 }
 
 impl CompositorAction {
@@ -202,6 +205,7 @@ impl CompositorAction {
         match self {
             CompositorAction::QuitFocusedWindow => { let _ = quit_focused_window(state); },
             CompositorAction::QuitCompositor => { let _ = quit_compositor(state); },
+            CompositorAction::ReloadConfig => { let _ = state.reload_config(); }
         }
     }
 }
