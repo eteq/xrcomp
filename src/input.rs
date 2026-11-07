@@ -29,11 +29,11 @@ impl<BackendData: Backend + 'static> State<BackendData> {
                     time,
                     |state, modifiers, handle| {
                         if press_state == KeyState::Pressed && state.config.compositor_modifier.matches_state(modifiers) {
-                            if handle.modified_sym() == Keysym::from_char(state.config.quit_focused_window_key) {
+                            if handle.raw_syms().contains(&Keysym::from_char(state.config.quit_focused_window_key)) {
                                 FilterResult::Intercept(CompositorAction::QuitFocusedWindow)
-                            } else if handle.modified_sym() == Keysym::from_char(state.config.quit_compositor_key) {
+                            } else if handle.raw_syms().contains(&Keysym::from_char(state.config.quit_compositor_key)) {
                                 FilterResult::Intercept(CompositorAction::QuitCompositor)
-                            } else if handle.modified_sym() == Keysym::from_char(state.config.reload_config_key) {
+                            } else if handle.raw_syms().contains(&Keysym::from_char(state.config.reload_config_key)) {
                                 FilterResult::Intercept(CompositorAction::ReloadConfig)
                             } else {
                                 FilterResult::Forward

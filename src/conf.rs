@@ -32,6 +32,9 @@ pub enum ModifierKey {
     Alt,
     Shift,
     Super,
+    CtrlSuper,
+    AltSuper,
+    ShiftSuper,
     Nomod
 }
 
@@ -42,6 +45,9 @@ impl  ModifierKey {
             ModifierKey::Alt => !modifiers.ctrl && modifiers.alt && !modifiers.shift && !modifiers.logo,
             ModifierKey::Shift => !modifiers.ctrl && !modifiers.alt && modifiers.shift && !modifiers.logo,
             ModifierKey::Super => !modifiers.ctrl && !modifiers.alt && !modifiers.shift && modifiers.logo,
+            ModifierKey::CtrlSuper => modifiers.ctrl && !modifiers.alt && !modifiers.shift && modifiers.logo,
+            ModifierKey::AltSuper => !modifiers.ctrl && modifiers.alt && !modifiers.shift && modifiers.logo,
+            ModifierKey::ShiftSuper => !modifiers.ctrl && !modifiers.alt && modifiers.shift && modifiers.logo,
             ModifierKey::Nomod => !modifiers.ctrl && !modifiers.alt && !modifiers.shift && !modifiers.logo,
         }
     }
