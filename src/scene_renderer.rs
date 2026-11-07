@@ -75,7 +75,7 @@ const FOV_Y: f32 = std::f32::consts::FRAC_PI_3;
 /// each backend's data and can be dropped and rebuilt along with it.
 #[derive(Debug)]
 pub struct SceneRenderer {
-    gl: Option<SceneGl>,
+    scenegl: Option<SceneGl>,
     windows: HashMap<Window, WindowTexture>,
     id: Id,
     commit: CommitCounter,
@@ -93,7 +93,7 @@ struct WindowTexture {
 impl SceneRenderer {
     pub fn new() -> Self {
         Self {
-            gl: None,
+            scenegl: None,
             windows: HashMap::new(),
             id: Id::new(),
             commit: CommitCounter::default(),
@@ -109,9 +109,9 @@ impl SceneRenderer {
         space: &Space<Window>,
         output: &Output,
     ) -> Option<SceneElement> {
-        if self.gl.is_none() {
+        if self.scenegl.is_none() {
             match renderer.with_context(|gl| unsafe { SceneGl::new(gl) }) {
-                Ok(Ok(gl)) => self.gl = Some(gl),
+                Ok(Ok(gl)) => self.scenegl = Some(gl),
                 Ok(Err(err)) => {
                     warn!("Failed to set up scene GL resources: {}", err);
                     return None;
@@ -164,7 +164,7 @@ impl SceneRenderer {
             id: self.id.clone(),
             commit: self.commit,
             size: output_geo.size.to_physical_precise_round(scale),
-            gl: self.gl?,
+            scenegl: self.scenegl?,
             view_proj: camera_view_proj(output_geo),
             quads,
         })
@@ -368,7 +368,7 @@ pub struct SceneElement {
     id: Id,
     commit: CommitCounter,
     size: Size<i32, Physical>,
-    gl: SceneGl,
+    scenegl: SceneGl,
     view_proj: Mat4,
     quads: Vec<Quad>,
 }
@@ -402,6 +402,6 @@ impl RenderElement<GlowRenderer> for SceneElement {
         _cache: Option<&UserDataMap>,
     ) -> Result<(), GlesError> {
         let view_proj = target_matrix(frame.transformation()) * self.view_proj;
-        frame.with_context(|gl| unsafe { self.gl.draw(gl, view_proj, &self.quads) })
+        frame.with_context(|gl| unsafe { self.scenegl.draw(gl, view_proj, &self.quads) })
     }
 }
