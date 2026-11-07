@@ -23,7 +23,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     render_helpers::{CLEAR_COLOR, collect_output_elements},
-    scene::Scene,
+    scene_renderer::SceneRenderer,
     state::{Backend, State},
 };
 
@@ -35,7 +35,7 @@ pub struct X11Data {
     damage_tracker: OutputDamageTracker,
     dmabuf_state: DmabufState,
     _dmabuf_global: DmabufGlobal,
-    scene: Scene,
+    scene_renderer: SceneRenderer,
 }
 
 impl Backend for X11Data {
@@ -128,7 +128,7 @@ pub fn run_x11(ipc_socket_name: Option<String>) {
         damage_tracker,
         dmabuf_state,
         _dmabuf_global: dmabuf_global,
-        scene: Scene::new(),
+        scene_renderer: SceneRenderer::new(),
     };
 
     let mut state = State::new(&mut event_loop, display, data, ipc_socket_name);
@@ -193,7 +193,7 @@ fn render_frame(state: &mut State<X11Data>, output: &Output) -> bool {
     let backend_data = &mut state.backend_data;
 
     let scene_element = backend_data
-        .scene
+        .scene_renderer
         .prepare(&mut backend_data.renderer, &state.space, output);
 
     let (mut buffer, age) = match backend_data.surface.buffer() {

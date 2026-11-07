@@ -14,6 +14,7 @@ use smithay::{
     output::Output,
     utils::{Physical, Point},
 };
+use crate::scene_renderer::SceneElement;
 
 pub const CLEAR_COLOR: Color32F = Color32F::new(0.1, 0.1, 0.1, 1.0);
 
@@ -22,14 +23,14 @@ pub const CLEAR_COLOR: Color32F = Color32F::new(0.1, 0.1, 0.1, 1.0);
 // `GlowRenderer`, so this is tied to that concrete type rather than being generic.
 smithay::backend::renderer::element::render_elements! {
     pub OutputElement<=GlowRenderer>;
-    Scene=crate::scene::SceneElement,
+    Scene=SceneElement,
     Cursor=SolidColorRenderElement,
 }
 
 /// The elements for one output frame, front to back: the cursor on top of the scene.
 pub fn collect_output_elements(
     cursor: SolidColorRenderElement,
-    scene: Option<crate::scene::SceneElement>,
+    scene: Option<SceneElement>,
 ) -> Vec<OutputElement> {
     std::iter::once(OutputElement::Cursor(cursor))
         .chain(scene.map(OutputElement::Scene))

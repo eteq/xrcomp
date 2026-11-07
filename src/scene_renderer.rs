@@ -12,6 +12,10 @@
 //! The camera is set up so that a quad at z = 0 lands on exactly the same pixels the window
 //! would occupy in plain 2D. As long as windows stay on that plane, the 2D `Space` layout
 //! used for input (`surface_under` etc.) still lines up with what is drawn.
+//!
+//! This module only holds the renderer-side half of the scene: GPU resources that are tied
+//! to one renderer and are pure caches. Where windows are placed in 3D is compositor
+//! state and lives in [`crate::scene_layout`].
 
 use std::{collections::HashMap, num::NonZeroU32};
 
@@ -40,6 +44,8 @@ use smithay::{
 };
 use tracing::warn;
 
+use crate::scene_layout::window_placement;
+
 const VERTEX_SHADER: &str = r#"#version 100
 attribute vec2 a_pos;
 uniform mat4 u_mvp;
@@ -64,9 +70,11 @@ void main() {
 /// Vertical field of view of the scene camera.
 const FOV_Y: f32 = std::f32::consts::FRAC_PI_3;
 
-/// Per-backend scene state; lives next to the renderer in each backend's data.
+/// GPU cache for drawing the scene: per-window textures and the GL objects for the quad
+/// pass. Everything in here belongs to one renderer, so it lives next to that renderer in
+/// each backend's data and can be dropped and rebuilt along with it.
 #[derive(Debug)]
-pub struct Scene {
+pub struct SceneRenderer {
     gl: Option<SceneGl>,
     windows: HashMap<Window, WindowTexture>,
     id: Id,
@@ -82,7 +90,7 @@ struct WindowTexture {
     age: usize,
 }
 
-impl Scene {
+impl SceneRenderer {
     pub fn new() -> Self {
         Self {
             gl: None,
@@ -209,18 +217,10 @@ impl Scene {
     }
 }
 
-impl Default for Scene {
+impl Default for SceneRenderer {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Where a window sits in 3D, applied on top of its 2D layout position.
-///
-/// This is the hook for 3D placement; the identity keeps every window on the z = 0 plane,
-/// where it lines up exactly with its 2D position.
-fn window_placement(_window: &Window) -> Mat4 {
-    Mat4::IDENTITY
 }
 
 /// A perspective camera looking straight at the output's rectangle on the z = 0 plane,

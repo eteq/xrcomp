@@ -47,7 +47,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     render_helpers::{CLEAR_COLOR, OutputElement, collect_output_elements, output_scale},
-    scene::Scene,
+    scene_renderer::SceneRenderer,
     state::{Backend, State},
 };
 
@@ -70,7 +70,7 @@ pub struct UdevData {
     surfaces: HashMap<crtc::Handle, SurfaceData>,
     dmabuf_state: DmabufState,
     _dmabuf_global: DmabufGlobal,
-    scene: Scene,
+    scene_renderer: SceneRenderer,
 }
 
 impl Backend for UdevData {
@@ -165,7 +165,7 @@ pub fn run_udev(ipc_socket_name: Option<String>) {
         surfaces: HashMap::new(),
         dmabuf_state,
         _dmabuf_global: dmabuf_global,
-        scene: Scene::new(),
+        scene_renderer: SceneRenderer::new(),
     };
 
     let mut state = State::new(&mut event_loop, display, data, ipc_socket_name);
@@ -388,7 +388,7 @@ impl State<UdevData> {
             .build_render_element(cursor_pos, scale);
 
         let backend = &mut self.backend_data;
-        let scene_element = backend.scene.prepare(&mut backend.renderer, &self.space, &output);
+        let scene_element = backend.scene_renderer.prepare(&mut backend.renderer, &self.space, &output);
         let elements = collect_output_elements(cursor_element, scene_element);
 
         let Some(surface) = self.backend_data.surfaces.get_mut(&crtc) else {

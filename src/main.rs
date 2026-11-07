@@ -3,7 +3,8 @@ mod handlers;
 mod input;
 mod compositor_ipc;
 mod render_helpers;
-mod scene;
+mod scene_renderer;
+mod scene_layout;
 mod state;
 
 #[cfg(feature = "udev")]
