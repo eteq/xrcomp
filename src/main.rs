@@ -7,6 +7,9 @@ mod scene_renderer;
 mod scene_layout;
 mod state;
 
+#[cfg(not(any(feature = "udev", feature = "winit", feature = "x11")))]
+compile_error!("No xrcomp backend is enabled. Please enable one of 'udev', 'winit', or 'x11'.");
+
 #[cfg(feature = "udev")]
 mod udev;
 #[cfg(feature = "winit")]
@@ -47,9 +50,13 @@ fn main() {
 
     let backend = match cli.backend {
         Some(b)=> b,
-        None => Commands::Udev
+        #[cfg(feature = "udev")]
+        None => Commands::Udev,
+        #[cfg(all(not(feature = "udev"), feature = "x11"))]
+        None => Commands::X11,
+        #[cfg(all(not(feature = "udev"), not(feature = "x11"), feature = "winit"))]
+        None => Commands::Winit,
     };
-
     match backend {
         #[cfg(feature = "udev")]
         Commands::Udev => {

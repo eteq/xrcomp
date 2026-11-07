@@ -85,6 +85,8 @@ impl Default for Cursor {
     }
 }
 
+// not all backends use this so we supress the unused warning
+#[allow(dead_code)]
 pub fn output_scale(output: &Output) -> smithay::utils::Scale<f64> {
     smithay::utils::Scale::from(output.current_scale().fractional_scale())
 }
