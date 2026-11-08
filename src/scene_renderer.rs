@@ -352,6 +352,7 @@ impl SceneGl {
                 gl.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
             }
 
+            // Reset GL state to what Smithay expects: no texture bound, vertex attrib array disabled, buffer unbound, no program used.
             gl.bind_texture(glow::TEXTURE_2D, None);
             gl.disable_vertex_attrib_array(self.a_pos);
             gl.bind_buffer(glow::ARRAY_BUFFER, None);
