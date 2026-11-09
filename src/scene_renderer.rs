@@ -187,6 +187,7 @@ impl SceneRenderer {
             .is_none_or(|entry| entry.texture.size() != buffer_size);
         if needs_new_texture {
             let texture: GlesTexture = renderer.create_buffer(Fourcc::Abgr8888, buffer_size)?;
+            renderer.with_context(|gl| unsafe { init_texture_params(gl, &texture) })?;
             self.windows.insert(
                 window.clone(),
                 WindowTexture {
@@ -221,6 +222,27 @@ impl SceneRenderer {
 impl Default for SceneRenderer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Sets the sampling state of a freshly created window texture, once.
+///
+/// As of this writing, Smithay doesn't override any of this, 
+/// although that might change in the future so is something to
+/// watch out for 
+unsafe fn init_texture_params(gl: &glow::Context, texture: &GlesTexture) {
+    let Some(tex_id) = NonZeroU32::new(texture.tex_id()) else {
+        return;
+    };
+    unsafe {
+        gl.bind_texture(glow::TEXTURE_2D, Some(glow::NativeTexture(tex_id)));
+        
+        gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MIN_FILTER, glow::LINEAR as i32);
+        gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MAG_FILTER, glow::LINEAR as i32);
+        gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_S, glow::CLAMP_TO_EDGE as i32);
+        gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_T, glow::CLAMP_TO_EDGE as i32);
+
+        gl.bind_texture(glow::TEXTURE_2D, None);
     }
 }
 
@@ -391,8 +413,6 @@ impl SceneGl {
                     continue;
                 };
                 gl.bind_texture(glow::TEXTURE_2D, Some(glow::NativeTexture(tex_id)));
-                gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MIN_FILTER, glow::LINEAR as i32);
-                gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MAG_FILTER, glow::LINEAR as i32);
 
                 let mvp = view_proj * quad.model;
                 gl.uniform_matrix_4_f32_slice(Some(&self.u_mvp), false, &mvp.to_cols_array());
