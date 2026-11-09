@@ -17,11 +17,10 @@
 //! to one renderer and are pure caches. Where windows are placed in 3D is compositor
 //! state and lives in [`crate::scene_layout`].
 
-use std::{collections::HashMap, num::NonZeroU32};
+use std::{collections::HashMap, num::NonZeroU32, mem::offset_of};
 
 use glam::{
-    Affine2, Mat4, Vec3, Vec4,
-    camera::rh::{proj::opengl::perspective, view::look_at_mat4},
+    Affine2, Mat4, Vec2, Vec3, Vec4, camera::rh::{proj::opengl::perspective, view::look_at_mat4},
 };
 use glow::HasContext;
 use smithay::{
@@ -42,28 +41,30 @@ use smithay::{
     output::Output,
     utils::{Buffer, Logical, Physical, Point, Rectangle, Scale, Size, Transform, user_data::UserDataMap},
 };
+use bytemuck;
 use tracing::warn;
 
 use crate::scene_layout::window_placement;
 
 const VERTEX_SHADER: &str = r#"#version 100
-attribute vec2 a_pos;
-uniform mat4 u_mvp;
-varying vec2 v_uv;
+attribute vec3 a_pos;
+attribute vec2 a_tex;
+uniform mat4 u_mvp; 
+varying vec2 v_st;
 void main() {
-    v_uv = a_pos;
-    gl_Position = u_mvp * vec4(a_pos, 0.0, 1.0);
+    v_st = a_tex;
+    gl_Position = u_mvp * vec4(a_pos, 1.0);
 }
 "#;
 
 // Window textures hold premultiplied alpha, matching the blend function Smithay sets up
 // at the start of every frame (`ONE, ONE_MINUS_SRC_ALPHA`).
 const FRAGMENT_SHADER: &str = r#"#version 100
-precision mediump float;
+precision highp float;
 uniform sampler2D u_tex;
-varying vec2 v_uv;
+varying vec2 v_st;
 void main() {
-    gl_FragColor = texture2D(u_tex, v_uv);
+    gl_FragColor = texture2D(u_tex, v_st);
 }
 "#;
 
@@ -251,6 +252,7 @@ fn target_matrix(transform: Transform) -> Mat4 {
     )
 }
 
+
 #[derive(Debug, Clone)]
 struct Quad {
     texture: GlesTexture,
@@ -258,12 +260,51 @@ struct Quad {
     model: Mat4,
 }
 
+/// A vertex in the scene, consisting of a position and texture coordinates.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct SceneVertex {
+    pos: Vec3,
+    st: Vec2,
+}
+
+impl SceneVertex {
+    fn setup_attribs(gl: &glow::Context, pos: u32, tex: u32, reset_divisor: bool) {
+        let stride = size_of::<SceneVertex>() as i32;
+        let offset_pos = offset_of!(SceneVertex, pos) as i32;
+        let offset_st = offset_of!(SceneVertex, st) as i32;
+        let size_pos = size_of::<Vec3>() as i32 / size_of::<f32>() as i32;
+        let size_st = size_of::<Vec2>() as i32 / size_of::<f32>() as i32;
+        unsafe {
+            gl.enable_vertex_attrib_array(pos);
+            gl.vertex_attrib_pointer_f32(pos, size_pos, glow::FLOAT, false, stride, offset_pos);
+            gl.enable_vertex_attrib_array(tex);
+            gl.vertex_attrib_pointer_f32(tex, size_st, glow::FLOAT, false, stride, offset_st);
+            if reset_divisor {
+                gl.vertex_attrib_divisor(pos, 0);
+                gl.vertex_attrib_divisor(tex, 0);
+            }
+        }
+    }
+
+    fn cleanup_attribs(gl: &glow::Context, pos: u32, tex: u32) {
+        unsafe {
+            gl.disable_vertex_attrib_array(pos);
+            gl.disable_vertex_attrib_array(tex);
+        }
+    }
+
+    const DRAW_MODE: u32 = glow::TRIANGLE_STRIP;
+}
+
 /// GL objects for drawing the scene, created once per renderer.
 #[derive(Debug, Clone, Copy)]
 struct SceneGl {
     program: glow::Program,
     vbo: glow::Buffer,
+    n_verts: i32,
     a_pos: u32,
+    a_tex: u32,
     u_mvp: glow::UniformLocation,
     u_tex: glow::UniformLocation,
     /// GLES 3+ supports instancing, which Smithay uses and leaves divisors set for.
@@ -300,6 +341,9 @@ impl SceneGl {
             let a_pos = gl
                 .get_attrib_location(program, "a_pos")
                 .ok_or("missing attribute a_pos")?;
+            let a_tex = gl
+                .get_attrib_location(program, "a_tex")
+                .ok_or("missing attribute a_tex")?;
             let u_mvp = gl
                 .get_uniform_location(program, "u_mvp")
                 .ok_or("missing uniform u_mvp")?;
@@ -307,18 +351,23 @@ impl SceneGl {
                 .get_uniform_location(program, "u_tex")
                 .ok_or("missing uniform u_tex")?;
 
-            // Unit square as a triangle strip; doubles as texture coordinates.
-            let vertices: [f32; 8] = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
-            let bytes: Vec<u8> = vertices.iter().flat_map(|v| v.to_ne_bytes()).collect();
+            // Unit square as a triangle strip
+            let verts = [SceneVertex { pos: Vec3::new(0.0, 0.0, 0.0), st: Vec2::new(0.0, 0.0) },
+                                           SceneVertex { pos: Vec3::new(1.0, 0.0, 0.0), st: Vec2::new(1.0, 0.0) },
+                                           SceneVertex { pos: Vec3::new(0.0, 1.0, 0.0), st: Vec2::new(0.0, 1.0) },
+                                           SceneVertex { pos: Vec3::new(1.0, 1.0, 0.0), st: Vec2::new(1.0, 1.0) },
+            ];
             let vbo = gl.create_buffer()?;
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
-            gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, &bytes, glow::STATIC_DRAW);
+            gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, bytemuck::cast_slice(&verts), glow::STATIC_DRAW);
             gl.bind_buffer(glow::ARRAY_BUFFER, None);
 
             Ok(Self {
                 program,
                 vbo,
+                n_verts: verts.len() as i32,
                 a_pos,
+                a_tex,
                 u_mvp,
                 u_tex,
                 reset_divisor: gl.version().major >= 3,
@@ -332,11 +381,8 @@ impl SceneGl {
         unsafe {
             gl.use_program(Some(self.program));
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.vbo));
-            gl.enable_vertex_attrib_array(self.a_pos);
-            gl.vertex_attrib_pointer_f32(self.a_pos, 2, glow::FLOAT, false, 0, 0);
-            if self.reset_divisor {
-                gl.vertex_attrib_divisor(self.a_pos, 0);
-            }
+            SceneVertex::setup_attribs(gl, self.a_pos, self.a_tex, self.reset_divisor);
+
             gl.active_texture(glow::TEXTURE0);
             gl.uniform_1_i32(Some(&self.u_tex), 0);
 
@@ -347,14 +393,16 @@ impl SceneGl {
                 gl.bind_texture(glow::TEXTURE_2D, Some(glow::NativeTexture(tex_id)));
                 gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MIN_FILTER, glow::LINEAR as i32);
                 gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MAG_FILTER, glow::LINEAR as i32);
+
                 let mvp = view_proj * quad.model;
                 gl.uniform_matrix_4_f32_slice(Some(&self.u_mvp), false, &mvp.to_cols_array());
-                gl.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
+
+                gl.draw_arrays(SceneVertex::DRAW_MODE, 0, self.n_verts);
             }
 
             // Reset GL state to what Smithay expects: no texture bound, vertex attrib array disabled, buffer unbound, no program used.
             gl.bind_texture(glow::TEXTURE_2D, None);
-            gl.disable_vertex_attrib_array(self.a_pos);
+            SceneVertex::cleanup_attribs(gl, self.a_pos, self.a_tex);
             gl.bind_buffer(glow::ARRAY_BUFFER, None);
             gl.use_program(None);
         }
@@ -404,5 +452,11 @@ impl RenderElement<GlowRenderer> for SceneElement {
     ) -> Result<(), GlesError> {
         let view_proj = target_matrix(frame.transformation()) * self.view_proj;
         frame.with_context(|gl| unsafe { self.scenegl.draw(gl, view_proj, &self.quads) })
+        // When implementing SBS stereo, need to do viewport cleanup like so:
+        // let mut vp = [0i32; 4];
+        // gl.get_parameter_i32_slice(glow::VIEWPORT, &mut vp);
+        //  let [x, y, w, h] = vp;
+        // ... 
+        // gl.viewport(x, y, w, h);
     }
 }
