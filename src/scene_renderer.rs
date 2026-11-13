@@ -5,7 +5,7 @@
 //! 1. [`Scene::prepare`] renders each window (including its subsurfaces and popups) flat into
 //!    its own offscreen texture, using Smithay's normal 2D pipeline and damage tracking.
 //! 2. The [`SceneElement`] it returns is a single full-output render element whose `draw`
-//!    uses hand-written GL ES (via glow) to draw those textures as quads with our own
+//!    uses hand-written GL ES (via glow) to draw those textures as shapes with our own
 //!    view/projection matrices. Drawing a window from several perspectives just means
 //!    sampling its texture several times.
 //!
@@ -17,12 +17,13 @@
 //! to one renderer and are pure caches. Where windows are placed in 3D is compositor
 //! state and lives in [`crate::scene_layout`].
 
-use std::{collections::HashMap, num::NonZeroU32, mem::offset_of};
+use std::{collections::HashMap, num::NonZeroU32, mem::offset_of, rc::Rc};
 
 use glam::{
     Affine2, Mat4, Vec2, Vec3, Vec4, camera::rh::{proj::opengl::perspective, view::look_at_mat4},
 };
 use glow::HasContext;
+use glow::NativeBuffer;
 use smithay::{
     backend::{
         allocator::Fourcc,
@@ -76,7 +77,7 @@ const FOV_Y: f32 = std::f32::consts::FRAC_PI_3;
 /// each backend's data and can be dropped and rebuilt along with it.
 #[derive(Debug)]
 pub struct SceneRenderer {
-    scenegl: Option<SceneGl>,
+    scenegl: Option<Rc<SceneGl>>,
     windows: HashMap<Window, WindowTexture>,
     id: Id,
     commit: CommitCounter,
@@ -112,7 +113,7 @@ impl SceneRenderer {
     ) -> Option<SceneElement> {
         if self.scenegl.is_none() {
             match renderer.with_context(|gl| unsafe { SceneGl::new(gl) }) {
-                Ok(Ok(gl)) => self.scenegl = Some(gl),
+                Ok(Ok(scenegl)) => self.scenegl = Some(Rc::new(scenegl)),
                 Ok(Err(err)) => {
                     warn!("Failed to set up scene GL resources: {}", err);
                     return None;
@@ -131,7 +132,7 @@ impl SceneRenderer {
 
         // `Space::elements` is back to front, which is the order to draw in while all
         // windows are on the same plane.
-        let mut quads = Vec::new();
+        let mut windowmodels = Vec::new();
         for window in space.elements() {
             let bbox = window.bbox_with_popups();
             if bbox.is_empty() {
@@ -157,7 +158,21 @@ impl SceneRenderer {
                 * Mat4::from_translation(Vec3::new(origin.x as f32, origin.y as f32, 0.0))
                 * Mat4::from_scale(Vec3::new(bbox.size.w as f32, bbox.size.h as f32, 1.0));
 
-            quads.push(Quad { texture, model });
+            windowmodels.push(WindowModel { texture, model, shape: ShapeType::Quad });
+        }
+
+
+        // TODO: replace this with the Scenegl initializer currently commented out if its better to just pre-populate all shape models whether used or not
+        // Populate vbos for all shapes that actually appear in a window model
+        let scenegl = self.scenegl.as_mut()?;
+        // Rc::get_mut works because no SceneElement from the previous frame is still alive here.
+        // If that ever stops being true, use RefCell for the vbos map instead.
+        if let Some(gl_mut) = Rc::get_mut(scenegl) {
+            renderer.with_context(|gl| {
+                for wm in &windowmodels {
+                    gl_mut.vbos.entry(wm.shape).or_insert_with(|| wm.shape.make_vbo(gl));
+                }
+            }).ok()?;
         }
 
         self.commit.increment();
@@ -165,9 +180,9 @@ impl SceneRenderer {
             id: self.id.clone(),
             commit: self.commit,
             size: output_geo.size.to_physical_precise_round(scale),
-            scenegl: self.scenegl?,
+            scenegl: Rc::clone(scenegl),
             view_proj: camera_view_proj(output_geo),
-            quads,
+            windowmodels,
         })
     }
 
@@ -274,57 +289,11 @@ fn target_matrix(transform: Transform) -> Mat4 {
     )
 }
 
-
+/// GL object for drawing the scene, created once per renderer.
 #[derive(Debug, Clone)]
-struct Quad {
-    texture: GlesTexture,
-    /// Maps the unit square (0..1, 0..1) to the window's place in world space.
-    model: Mat4,
-}
-
-/// A vertex in the scene, consisting of a position and texture coordinates.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct SceneVertex {
-    pos: Vec3,
-    st: Vec2,
-}
-
-impl SceneVertex {
-    fn setup_attribs(gl: &glow::Context, pos: u32, tex: u32, reset_divisor: bool) {
-        let stride = size_of::<SceneVertex>() as i32;
-        let offset_pos = offset_of!(SceneVertex, pos) as i32;
-        let offset_st = offset_of!(SceneVertex, st) as i32;
-        let size_pos = size_of::<Vec3>() as i32 / size_of::<f32>() as i32;
-        let size_st = size_of::<Vec2>() as i32 / size_of::<f32>() as i32;
-        unsafe {
-            gl.enable_vertex_attrib_array(pos);
-            gl.vertex_attrib_pointer_f32(pos, size_pos, glow::FLOAT, false, stride, offset_pos);
-            gl.enable_vertex_attrib_array(tex);
-            gl.vertex_attrib_pointer_f32(tex, size_st, glow::FLOAT, false, stride, offset_st);
-            if reset_divisor {
-                gl.vertex_attrib_divisor(pos, 0);
-                gl.vertex_attrib_divisor(tex, 0);
-            }
-        }
-    }
-
-    fn cleanup_attribs(gl: &glow::Context, pos: u32, tex: u32) {
-        unsafe {
-            gl.disable_vertex_attrib_array(pos);
-            gl.disable_vertex_attrib_array(tex);
-        }
-    }
-
-    const DRAW_MODE: u32 = glow::TRIANGLE_STRIP;
-}
-
-/// GL objects for drawing the scene, created once per renderer.
-#[derive(Debug, Clone, Copy)]
 struct SceneGl {
     program: glow::Program,
-    vbo: glow::Buffer,
-    n_verts: i32,
+    vbos: HashMap<ShapeType, (glow::Buffer, i32)>,
     a_pos: u32,
     a_tex: u32,
     u_mvp: glow::UniformLocation,
@@ -373,21 +342,19 @@ impl SceneGl {
                 .get_uniform_location(program, "u_tex")
                 .ok_or("missing uniform u_tex")?;
 
-            // Unit square as a triangle strip
-            let verts = [SceneVertex { pos: Vec3::new(0.0, 0.0, 0.0), st: Vec2::new(0.0, 0.0) },
-                                           SceneVertex { pos: Vec3::new(1.0, 0.0, 0.0), st: Vec2::new(1.0, 0.0) },
-                                           SceneVertex { pos: Vec3::new(0.0, 1.0, 0.0), st: Vec2::new(0.0, 1.0) },
-                                           SceneVertex { pos: Vec3::new(1.0, 1.0, 0.0), st: Vec2::new(1.0, 1.0) },
-            ];
-            let vbo = gl.create_buffer()?;
-            gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
-            gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, bytemuck::cast_slice(&verts), glow::STATIC_DRAW);
-            gl.bind_buffer(glow::ARRAY_BUFFER, None);
+            let vbos = HashMap::new();
+
+            // TODO: switch to this if its better than the lazy creation in SceneRenderer that currently happens
+            // requires adding strum to cargo.toml, use strum::{EnumIter, IntoEnumIterator};, and making ShapeType derive EnumIter
+            //Initialize VBOs for all the shapes here since we cant in draw as it needs to take a non-mut ref to self
+            // for shape in ShapeType::iter() {
+            //     let vbo = shape.make_vbo(gl);
+            //     vbos.insert(shape, vbo);
+            // }
 
             Ok(Self {
                 program,
-                vbo,
-                n_verts: verts.len() as i32,
+                vbos,
                 a_pos,
                 a_tex,
                 u_mvp,
@@ -397,27 +364,31 @@ impl SceneGl {
         }
     }
 
-    /// Draws `quads` in order. Leaves the GL state the way Smithay expects it: blending and
+    /// Draws `windowmodels` in order. Leaves the GL state the way Smithay expects it: blending and
     /// viewport untouched, and no program, buffer or texture bound.
-    unsafe fn draw(&self, gl: &glow::Context, view_proj: Mat4, quads: &[Quad]) {
+    unsafe fn draw(&self, gl: &glow::Context, view_proj: Mat4, windowmodels: &[WindowModel]) {
         unsafe {
             gl.use_program(Some(self.program));
-            gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.vbo));
-            SceneVertex::setup_attribs(gl, self.a_pos, self.a_tex, self.reset_divisor);
+            
 
             gl.active_texture(glow::TEXTURE0);
             gl.uniform_1_i32(Some(&self.u_tex), 0);
 
-            for quad in quads {
-                let Some(tex_id) = NonZeroU32::new(quad.texture.tex_id()) else {
+            for model in windowmodels {
+                let (vbo, nverts) = self.vbos[&model.shape];
+                gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
+                SceneVertex::setup_attribs(gl, self.a_pos, self.a_tex, self.reset_divisor);
+                let Some(tex_id) = NonZeroU32::new(model.texture.tex_id()) else {
                     continue;
                 };
                 gl.bind_texture(glow::TEXTURE_2D, Some(glow::NativeTexture(tex_id)));
 
-                let mvp = view_proj * quad.model;
+                let offset = Mat4::from_translation(Vec3::new(0.5, 0.5, 0.0));
+
+                let mvp = view_proj * model.model * offset;
                 gl.uniform_matrix_4_f32_slice(Some(&self.u_mvp), false, &mvp.to_cols_array());
 
-                gl.draw_arrays(SceneVertex::DRAW_MODE, 0, self.n_verts);
+                gl.draw_arrays(SceneVertex::DRAW_MODE, 0, nverts);
             }
 
             // Reset GL state to what Smithay expects: no texture bound, vertex attrib array disabled, buffer unbound, no program used.
@@ -437,9 +408,9 @@ pub struct SceneElement {
     id: Id,
     commit: CommitCounter,
     size: Size<i32, Physical>,
-    scenegl: SceneGl,
+    scenegl: Rc<SceneGl>,
     view_proj: Mat4,
-    quads: Vec<Quad>,
+    windowmodels: Vec<WindowModel>,
 }
 
 impl Element for SceneElement {
@@ -471,12 +442,92 @@ impl RenderElement<GlowRenderer> for SceneElement {
         _cache: Option<&UserDataMap>,
     ) -> Result<(), GlesError> {
         let view_proj = target_matrix(frame.transformation()) * self.view_proj;
-        frame.with_context(|gl| unsafe { self.scenegl.draw(gl, view_proj, &self.quads) })
+        frame.with_context(|gl| unsafe { self.scenegl.draw(gl, view_proj, &self.windowmodels) })
         // When implementing SBS stereo, need to do viewport cleanup like so:
         // let mut vp = [0i32; 4];
         // gl.get_parameter_i32_slice(glow::VIEWPORT, &mut vp);
         //  let [x, y, w, h] = vp;
         // ... 
         // gl.viewport(x, y, w, h);
+    }
+}
+
+// Structs for various opengl shapes to render
+
+/// A vertex in the scene, consisting of a position and texture coordinates.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct SceneVertex {
+    pos: Vec3,
+    st: Vec2,
+}
+
+impl SceneVertex {
+    fn setup_attribs(gl: &glow::Context, pos: u32, tex: u32, reset_divisor: bool) {
+        let stride = size_of::<SceneVertex>() as i32;
+        let offset_pos = offset_of!(SceneVertex, pos) as i32;
+        let offset_st = offset_of!(SceneVertex, st) as i32;
+        let size_pos = size_of::<Vec3>() as i32 / size_of::<f32>() as i32;
+        let size_st = size_of::<Vec2>() as i32 / size_of::<f32>() as i32;
+        unsafe {
+            gl.enable_vertex_attrib_array(pos);
+            gl.vertex_attrib_pointer_f32(pos, size_pos, glow::FLOAT, false, stride, offset_pos);
+            gl.enable_vertex_attrib_array(tex);
+            gl.vertex_attrib_pointer_f32(tex, size_st, glow::FLOAT, false, stride, offset_st);
+            if reset_divisor {
+                gl.vertex_attrib_divisor(pos, 0);
+                gl.vertex_attrib_divisor(tex, 0);
+            }
+        }
+    }
+
+    fn cleanup_attribs(gl: &glow::Context, pos: u32, tex: u32) {
+        unsafe {
+            gl.disable_vertex_attrib_array(pos);
+            gl.disable_vertex_attrib_array(tex);
+        }
+    }
+
+    const DRAW_MODE: u32 = glow::TRIANGLE_STRIP;
+}
+
+
+
+#[derive(Debug, Clone)]
+struct WindowModel {
+    texture: GlesTexture,
+    model: Mat4,
+    shape: ShapeType,
+}
+
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+enum ShapeType {
+    Quad,
+}
+
+impl ShapeType {
+    fn get_vertices(&self) -> Vec<SceneVertex> {
+        match self {
+            ShapeType::Quad => vec![
+                SceneVertex { pos: Vec3::new(-0.5, -0.5, 0.0), st: Vec2::new(0.0, 0.0) },
+                SceneVertex { pos: Vec3::new( 0.5, -0.5, 0.0), st: Vec2::new(1.0, 0.0) },
+                SceneVertex { pos: Vec3::new(-0.5,  0.5, 0.0), st: Vec2::new(0.0, 1.0) },
+                SceneVertex { pos: Vec3::new( 0.5,  0.5, 0.0), st: Vec2::new(1.0, 1.0) },
+            ],
+        }
+    }
+
+    fn make_vbo(&self, gl: &glow::Context) -> (NativeBuffer, i32) {
+        let vertices = self.get_vertices();
+        let vbo = unsafe {
+            let vbo = gl.create_buffer().unwrap();
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
+            gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, bytemuck::cast_slice(&vertices), glow::STATIC_DRAW);
+            gl.bind_buffer(glow::ARRAY_BUFFER, None);
+            vbo
+        };
+        
+        (vbo, vertices.len() as i32)
     }
 }

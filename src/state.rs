@@ -20,6 +20,7 @@ use tracing::{info, warn};
 
 use crate::render_helpers::Cursor;
 use crate::compositor_ipc::init_ipc_listener;
+use glam::Mat4;
 
 use xrcomp::ipc::get_first_free_default_socket_name;
 use xrcomp::conf;
@@ -60,6 +61,8 @@ pub struct State<BackendData: Backend + 'static> {
 
     pub cursor: Cursor,
 
+    pub user_view: Mat4,
+
     #[allow(dead_code)]
     pub ipc_socket_name: String,
 
@@ -96,6 +99,8 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         let mut cursor = Cursor::new();
         cursor.set_color_str(&config.cursor_color).expect("Failed to set cursor color from config");
         cursor.set_size(config.cursor_size);
+
+        let user_view = Mat4::IDENTITY;
 
         let space = Space::default();
 
@@ -147,6 +152,8 @@ impl<BackendData: Backend + 'static> State<BackendData> {
             seat,
 
             cursor,
+
+            user_view,
 
             ipc_socket_name,
             config,
