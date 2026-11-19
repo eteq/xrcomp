@@ -154,11 +154,11 @@ impl SceneRenderer {
                 continue;
             };
             let origin = location - window.geometry().loc + bbox.loc;
-            let model = window_placement(window)
+            let model_matrix = window_placement(window)
                 * Mat4::from_translation(Vec3::new(origin.x as f32, origin.y as f32, 0.0))
                 * Mat4::from_scale(Vec3::new(bbox.size.w as f32, bbox.size.h as f32, 1.0));
 
-            windowmodels.push(WindowModel { texture, model, shape: ShapeType::Quad });
+            windowmodels.push(WindowModel { texture, model_matrix, shape: ShapeType::Quad });
         }
 
 
@@ -264,7 +264,7 @@ unsafe fn init_texture_params(gl: &glow::Context, texture: &GlesTexture) {
 /// A perspective camera looking straight at the output's rectangle on the z = 0 plane,
 /// from the distance at which that rectangle exactly fills the view.
 fn camera_view_proj(output_geo: Rectangle<i32, Logical>) -> Mat4 {
-    let w = output_geo.size.w as f32;
+    let w: f32 = output_geo.size.w as f32;
     let h = output_geo.size.h as f32;
     let center = Vec3::new(output_geo.loc.x as f32 + w / 2.0, output_geo.loc.y as f32 + h / 2.0, 0.0);
     let distance = (h / 2.0) / (FOV_Y / 2.0).tan();
@@ -278,7 +278,7 @@ fn camera_view_proj(output_geo: Rectangle<i32, Logical>) -> Mat4 {
 /// Converts standard GL clip space (+y up) into what Smithay's frame expects for the bound
 /// target and output transform. This mirrors the `flip180 * transform.matrix()` part of
 /// the projection in `GlesRenderer::render`.
-fn target_matrix(transform: Transform) -> Mat4 {
+fn transform_matrix(transform: Transform) -> Mat4 {
     let flip180 = Affine2::from_cols_array(&[1.0, 0.0, 0.0, -1.0, 0.0, 0.0]);
     let m = flip180 * transform.matrix();
     Mat4::from_cols(
@@ -385,7 +385,7 @@ impl SceneGl {
 
                 let offset = Mat4::from_translation(Vec3::new(0.5, 0.5, 0.0));
 
-                let mvp = view_proj * model.model * offset;
+                let mvp = view_proj * model.model_matrix * offset;
                 gl.uniform_matrix_4_f32_slice(Some(&self.u_mvp), false, &mvp.to_cols_array());
 
                 gl.draw_arrays(SceneVertex::DRAW_MODE, 0, nverts);
@@ -441,9 +441,10 @@ impl RenderElement<GlowRenderer> for SceneElement {
         _opaque_regions: &[Rectangle<i32, Physical>],
         _cache: Option<&UserDataMap>,
     ) -> Result<(), GlesError> {
-        let view_proj = target_matrix(frame.transformation()) * self.view_proj;
-        frame.with_context(|gl| unsafe { self.scenegl.draw(gl, view_proj, &self.windowmodels) })
-        // When implementing SBS stereo, need to do viewport cleanup like so:
+        let transed_view_proj = transform_matrix(frame.transformation()) * self.view_proj;
+        frame.with_context(|gl| unsafe { self.scenegl.draw(gl, transed_view_proj, &self.windowmodels) })
+        // When implementing SBS stereo which likely will change the viewport, 
+        // need to do viewport cleanup like so:
         // let mut vp = [0i32; 4];
         // gl.get_parameter_i32_slice(glow::VIEWPORT, &mut vp);
         //  let [x, y, w, h] = vp;
@@ -496,7 +497,7 @@ impl SceneVertex {
 #[derive(Debug, Clone)]
 struct WindowModel {
     texture: GlesTexture,
-    model: Mat4,
+    model_matrix: Mat4,
     shape: ShapeType,
 }
 
