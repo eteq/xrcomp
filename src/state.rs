@@ -116,7 +116,7 @@ impl<BackendData: Backend + 'static> State<BackendData> {
             Ok(path) => {
                 match path.as_path().try_exists() {
                     Ok(exists) => {
-                        if exists {
+                        if !exists {
                             if let Err(e) = conf::write_config(&config) {
                                 warn!("Failed to write missing config file: {}", e);
                             } else {
