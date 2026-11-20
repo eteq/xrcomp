@@ -16,6 +16,7 @@ use smithay::{
 use glam::Mat4;
 
 use crate::state::{Backend, State, OutputKey};
+use xrcomp::ipc::CompositorAction;
 
 impl<BackendData: Backend + 'static> State<BackendData> {
     pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
@@ -58,7 +59,7 @@ impl<BackendData: Backend + 'static> State<BackendData> {
                 );
 
                 if let Some(action) = action {
-                    action.do_action(self);
+                    let _ = do_compositor_action(&action, self);
                 }
             }
             // Relative motion: emitted by real pointer devices (mice, trackpads) through
@@ -206,27 +207,18 @@ impl<BackendData: Backend + 'static> State<BackendData> {
     }
 }
 
-enum CompositorAction {
-    QuitFocusedWindow,
-    QuitCompositor,
-    ReloadConfig,
-    PanLeft,
-    PanRight,
-    PanUp,
-    PanDown,
-}
-
-impl CompositorAction {
-    fn do_action<B: Backend>(&self, state: &mut State<B>) {
-        match self {
-            CompositorAction::QuitFocusedWindow => { let _ = quit_focused_window(state); },
-            CompositorAction::QuitCompositor => { let _ = quit_compositor(state); },
-            CompositorAction::ReloadConfig => { let _ = state.reload_config(); },
-            CompositorAction::PanLeft => { let _ = pan_camera_vp(state, PanDirection::Left, state.config.pan_step_deg); },
-            CompositorAction::PanRight => { let _ = pan_camera_vp(state, PanDirection::Right, state.config.pan_step_deg); },
-            CompositorAction::PanUp => { let _ = pan_camera_vp(state, PanDirection::Up, state.config.pan_step_deg); },
-            CompositorAction::PanDown => { let _ = pan_camera_vp(state, PanDirection::Down, state.config.pan_step_deg); },
-        }
+pub fn do_compositor_action<B: Backend>(action: &CompositorAction, state: &mut State<B>) -> Result<(), ()> {
+    match action {
+        CompositorAction::QuitFocusedWindow => { quit_focused_window(state) },
+        CompositorAction::QuitCompositor => { quit_compositor(state) },
+        CompositorAction::ReloadConfig => { 
+            let res = state.reload_config();
+            if res.is_ok() { Ok(()) } else { Err(()) }  
+         },
+        CompositorAction::PanLeft => { pan_camera_vp(state, PanDirection::Left, state.config.pan_step_deg) },
+        CompositorAction::PanRight => { pan_camera_vp(state, PanDirection::Right, state.config.pan_step_deg) },
+        CompositorAction::PanUp => { pan_camera_vp(state, PanDirection::Up, state.config.pan_step_deg) },
+        CompositorAction::PanDown => { pan_camera_vp(state, PanDirection::Down, state.config.pan_step_deg) },
     }
 }
 

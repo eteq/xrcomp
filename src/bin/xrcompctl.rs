@@ -59,6 +59,13 @@ fn main() {
             }
         } 
     } else {
-        eprintln!("Command failed.");
+        match resp.result {
+            Some(r) => {
+                eprintln!("Command failed: {r}.");
+            },
+            None => {
+                eprintln!("Command failed.");
+            }
+        }
     }
 }

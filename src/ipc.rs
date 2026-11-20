@@ -1,7 +1,7 @@
 /// Data structures, etc for IPC and control of the compositor from an external
 /// process. Compositor binary-side implementations are in compositor_ipc.rs.
 
-use clap::Subcommand;
+use clap::{Subcommand, ValueEnum};
 use serde::{Serialize, Deserialize};
 
 use interprocess::local_socket::{prelude::*, GenericNamespaced, Stream};
@@ -20,6 +20,8 @@ pub enum Command {
     SaveConfigFile,
     /// Reload the current configuration file
     ReloadConfigFile,
+    /// Do the action of a specific keypress
+    DoCompositorAction { action: CompositorAction },
 }
 
 
@@ -58,4 +60,15 @@ pub fn get_first_free_default_socket_name() -> String {
         };
     }
     toret.unwrap()
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ValueEnum)]
+pub enum CompositorAction {
+    QuitFocusedWindow,
+    QuitCompositor,
+    ReloadConfig,
+    PanLeft,
+    PanRight,
+    PanUp,
+    PanDown,
 }

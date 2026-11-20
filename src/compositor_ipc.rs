@@ -15,6 +15,7 @@ use xrcomp::ipc::{Command, CommandResponse};
 use xrcomp::conf::{write_config, get_config_path};
 
 use crate::state::{Backend, State};
+use crate::input::do_compositor_action;
 
 pub(crate) fn init_ipc_listener<B: Backend + 'static>(loop_handle: &LoopHandle<'static, State<B>>, socket_name: &str) {
     let namespacename = socket_name.to_ns_name::<local_socket::GenericNamespaced>().expect("Failed to convert socket name to namespaced format");
@@ -158,6 +159,15 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
                     Err(e) => {
                         success = false;
                         result = Some(format!("Failed to reload configuration: {e}"));
+                    }
+                }
+            }
+            Command::DoCompositorAction { action } => {
+                match do_compositor_action(&action, state) {
+                    Ok(_) => success = true,
+                    Err(_) => {
+                        success = false;
+                        result = Some(format!("Failed to perform compositor action {:?}", action));
                     }
                 }
             }
