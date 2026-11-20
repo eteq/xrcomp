@@ -198,7 +198,7 @@ fn render_frame(state: &mut State<WinitData>, output: &Output) -> bool {
     };
 
     let cursor_element = state.cursor.build_render_element(cursor_pos, scale);
-    let scene_element = scene_renderer.prepare(backend.renderer(), &state.space, output);
+    let scene_element = scene_renderer.prepare(backend.renderer(), &state.space, output, &mut state.outputs_camera_vp);
     let elements = collect_output_elements(cursor_element, scene_element);
 
     let render_res = {

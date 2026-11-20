@@ -46,6 +46,7 @@ use bytemuck;
 use tracing::warn;
 
 use crate::scene_layout::window_placement;
+use crate::state::OutputKey;
 
 const VERTEX_SHADER: &str = r#"#version 100
 attribute vec3 a_pos;
@@ -110,6 +111,7 @@ impl SceneRenderer {
         renderer: &mut GlowRenderer,
         space: &Space<Window>,
         output: &Output,
+        outputs_camera_vp: &mut HashMap<OutputKey, Mat4>,
     ) -> Option<SceneElement> {
         if self.scenegl.is_none() {
             match renderer.with_context(|gl| unsafe { SceneGl::new(gl) }) {
@@ -175,15 +177,38 @@ impl SceneRenderer {
             }).ok()?;
         }
 
+        let view_proj = match outputs_camera_vp.get(&OutputKey::from(output)) {
+            Some(vp) => { *vp }
+            None => {
+                let vp = SceneRenderer::init_view_proj(output_geo);
+                outputs_camera_vp.insert(OutputKey::from(output), vp);
+                vp
+            }
+        };
+
         self.commit.increment();
         Some(SceneElement {
             id: self.id.clone(),
             commit: self.commit,
             size: output_geo.size.to_physical_precise_round(scale),
             scenegl: Rc::clone(scenegl),
-            view_proj: camera_view_proj(output_geo),
+            view_proj,
             windowmodels,
         })
+    }
+
+    fn init_view_proj(output_geo: Rectangle<i32, Logical>) -> Mat4 {
+        // A perspective camera looking straight at the output's rectangle on the z = 0 plane,
+        // from the distance at which that rectangle exactly fills the view.
+        let w: f32 = output_geo.size.w as f32;
+        let h = output_geo.size.h as f32;
+        let center = Vec3::new(output_geo.loc.x as f32 + w / 2.0, output_geo.loc.y as f32 + h / 2.0, 0.0);
+        let distance = (h / 2.0) / (FOV_Y / 2.0).tan();
+
+        // World y points down, so "up" for the camera is -y.
+        let view = look_at_mat4(center - Vec3::new(0.0, 0.0, distance), center, Vec3::NEG_Y);
+        let proj = perspective(FOV_Y, w / h, distance / 100.0, distance * 100.0);
+        proj * view
     }
 
     fn render_window_texture(
@@ -259,20 +284,6 @@ unsafe fn init_texture_params(gl: &glow::Context, texture: &GlesTexture) {
 
         gl.bind_texture(glow::TEXTURE_2D, None);
     }
-}
-
-/// A perspective camera looking straight at the output's rectangle on the z = 0 plane,
-/// from the distance at which that rectangle exactly fills the view.
-fn camera_view_proj(output_geo: Rectangle<i32, Logical>) -> Mat4 {
-    let w: f32 = output_geo.size.w as f32;
-    let h = output_geo.size.h as f32;
-    let center = Vec3::new(output_geo.loc.x as f32 + w / 2.0, output_geo.loc.y as f32 + h / 2.0, 0.0);
-    let distance = (h / 2.0) / (FOV_Y / 2.0).tan();
-
-    // World y points down, so "up" for the camera is -y.
-    let view = look_at_mat4(center - Vec3::new(0.0, 0.0, distance), center, Vec3::NEG_Y);
-    let proj = perspective(FOV_Y, w / h, distance / 100.0, distance * 100.0);
-    proj * view
 }
 
 /// Converts standard GL clip space (+y up) into what Smithay's frame expects for the bound

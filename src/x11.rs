@@ -194,7 +194,7 @@ fn render_frame(state: &mut State<X11Data>, output: &Output) -> bool {
 
     let scene_element = backend_data
         .scene_renderer
-        .prepare(&mut backend_data.renderer, &state.space, output);
+        .prepare(&mut backend_data.renderer, &state.space, output, &mut state.outputs_camera_vp);
 
     let (mut buffer, age) = match backend_data.surface.buffer() {
         Ok(b) => b,

@@ -1,7 +1,9 @@
-use std::{ffi::OsString, sync::Arc, time::Instant, mem, error};
+use std::{ffi::OsString, sync::Arc, time::Instant, mem, error, collections::HashMap};
 
 use smithay::{
-    desktop::{PopupManager, Space, Window, WindowSurfaceType}, input::{Seat, SeatState, pointer::PointerHandle}, reexports::{
+    desktop::{PopupManager, Space, Window, WindowSurfaceType}, input::{Seat, SeatState, pointer::PointerHandle}, 
+    output::Output,
+    reexports::{
         calloop::{EventLoop, Interest, LoopHandle, Mode, PostAction, generic::Generic}, wayland_server::{
             Display, DisplayHandle,
             backend::{ClientData, ClientId, DisconnectReason},
@@ -61,7 +63,7 @@ pub struct State<BackendData: Backend + 'static> {
 
     pub cursor: Cursor,
 
-    pub user_view: Mat4,
+    pub outputs_camera_vp: HashMap<OutputKey, Mat4>,
 
     #[allow(dead_code)]
     pub ipc_socket_name: String,
@@ -99,8 +101,6 @@ impl<BackendData: Backend + 'static> State<BackendData> {
         let mut cursor = Cursor::new();
         cursor.set_color_str(&config.cursor_color).expect("Failed to set cursor color from config");
         cursor.set_size(config.cursor_size);
-
-        let user_view = Mat4::IDENTITY;
 
         let space = Space::default();
 
@@ -153,7 +153,7 @@ impl<BackendData: Backend + 'static> State<BackendData> {
 
             cursor,
 
-            user_view,
+            outputs_camera_vp: HashMap::new(),
 
             ipc_socket_name,
             config,
@@ -260,4 +260,24 @@ pub struct ClientState {
 impl ClientData for ClientState {
     fn initialized(&self, _client_id: ClientId) {}
     fn disconnected(&self, _client_id: ClientId, _reason: DisconnectReason) {}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OutputKey {
+    connectorname: String,
+    make: String,
+    model: String,
+    serial_number: String,
+}
+
+impl From<&Output> for OutputKey {
+    fn from(output: &Output) -> Self {
+        let pps = output.physical_properties();
+        OutputKey {
+            connectorname: output.name(),
+            make: pps.make,
+            model: pps.model,
+            serial_number: pps.serial_number,
+        }
+    }
 }

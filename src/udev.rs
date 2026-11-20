@@ -388,7 +388,7 @@ impl State<UdevData> {
             .build_render_element(cursor_pos, scale);
 
         let backend = &mut self.backend_data;
-        let scene_element = backend.scene_renderer.prepare(&mut backend.renderer, &self.space, &output);
+        let scene_element = backend.scene_renderer.prepare(&mut backend.renderer, &self.space, &output, &mut self.outputs_camera_vp);
         let elements = collect_output_elements(cursor_element, scene_element);
 
         let Some(surface) = self.backend_data.surfaces.get_mut(&crtc) else {

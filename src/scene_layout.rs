@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 
 use smithay::desktop::Window;
 use glam::{Vec3, Mat4};

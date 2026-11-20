@@ -7,11 +7,15 @@ use smithay::{
         keyboard::{FilterResult, Keysym},
         pointer::{AxisFrame, ButtonEvent, MotionEvent, RelativeMotionEvent},
     },
+    output::Output,
+    desktop::Window,
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::SERIAL_COUNTER,
 };
 
-use crate::state::{Backend, State};
+use glam::Mat4;
+
+use crate::state::{Backend, State, OutputKey};
 
 impl<BackendData: Backend + 'static> State<BackendData> {
     pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
@@ -35,6 +39,14 @@ impl<BackendData: Backend + 'static> State<BackendData> {
                                 FilterResult::Intercept(CompositorAction::QuitCompositor)
                             } else if handle.raw_syms().contains(&Keysym::from_char(state.config.reload_config_key)) {
                                 FilterResult::Intercept(CompositorAction::ReloadConfig)
+                            } else if handle.raw_syms().contains(&Keysym::from_char(state.config.pan_left_key)) {
+                                FilterResult::Intercept(CompositorAction::PanLeft)
+                            } else if handle.raw_syms().contains(&Keysym::from_char(state.config.pan_right_key)) {
+                                FilterResult::Intercept(CompositorAction::PanRight)
+                            } else if handle.raw_syms().contains(&Keysym::from_char(state.config.pan_up_key)) {
+                                FilterResult::Intercept(CompositorAction::PanUp)
+                            } else if handle.raw_syms().contains(&Keysym::from_char(state.config.pan_down_key)) {
+                                FilterResult::Intercept(CompositorAction::PanDown)
                             } else {
                                 FilterResult::Forward
                             }
@@ -198,6 +210,10 @@ enum CompositorAction {
     QuitFocusedWindow,
     QuitCompositor,
     ReloadConfig,
+    PanLeft,
+    PanRight,
+    PanUp,
+    PanDown,
 }
 
 impl CompositorAction {
@@ -205,19 +221,35 @@ impl CompositorAction {
         match self {
             CompositorAction::QuitFocusedWindow => { let _ = quit_focused_window(state); },
             CompositorAction::QuitCompositor => { let _ = quit_compositor(state); },
-            CompositorAction::ReloadConfig => { let _ = state.reload_config(); }
+            CompositorAction::ReloadConfig => { let _ = state.reload_config(); },
+            CompositorAction::PanLeft => { let _ = pan_camera_vp(state, PanDirection::Left, state.config.pan_step_deg); },
+            CompositorAction::PanRight => { let _ = pan_camera_vp(state, PanDirection::Right, state.config.pan_step_deg); },
+            CompositorAction::PanUp => { let _ = pan_camera_vp(state, PanDirection::Up, state.config.pan_step_deg); },
+            CompositorAction::PanDown => { let _ = pan_camera_vp(state, PanDirection::Down, state.config.pan_step_deg); },
         }
     }
 }
 
-fn quit_focused_window<B: Backend>(state: &mut State<B>) -> Result<(), ()> {
+fn get_focused_window<B: Backend>(state: &mut State<B>) -> Option<Window> {
     if let Some(focused) = state.seat.get_keyboard().unwrap().current_focus() {
         if let Some(window) = state.space.elements().find(|w| w.toplevel().unwrap().wl_surface() == &focused) {
-            if let Some(toplevel) = window.clone().toplevel() {
-                toplevel.send_close();
-                return Ok(())
-            }
-        } 
+            return Some(window.clone());
+        }
+    }
+    None
+}
+
+fn get_focused_output<B: Backend>(state: &mut State<B>) -> Option<Output> {
+    let window = get_focused_window(state)?;
+    state.space.outputs_for_element(&window).into_iter().next()
+}
+
+fn quit_focused_window<B: Backend>(state: &mut State<B>) -> Result<(), ()> {
+    if let Some(foucused) = get_focused_window(state) {
+        if let Some(toplevel) = foucused.toplevel() {
+            toplevel.send_close();
+            return Ok(());
+        }
     }
     Err(())
 }
@@ -237,4 +269,30 @@ fn quit_compositor<B: Backend>(state: &mut State<B>) -> Result<(), ()> {
     state.quit_key_lastpress = Some(Instant::now());
 
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum PanDirection {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+fn pan_camera_vp<B: Backend>(state: &mut State<B>, direction: PanDirection, degs: f32) -> Result<(), ()> {
+    if let Some(output) = get_focused_output(state) {
+        let key = OutputKey::from(&output);
+        if let Some(camera) = state.outputs_camera_vp.remove(&key) {
+            let rads = degs.to_radians();
+            let panmat = match direction {
+                PanDirection::Left => { Mat4::from_rotation_y(-rads) },
+                PanDirection::Right => { Mat4::from_rotation_y(rads) },
+                PanDirection::Up => { Mat4::from_rotation_x(rads) },
+                PanDirection::Down => { Mat4::from_rotation_x(-rads) },
+            };
+            state.outputs_camera_vp.insert(key, camera * panmat);
+            return Ok(());
+        }
+    }
+    Err(())
 }
