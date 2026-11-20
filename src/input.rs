@@ -7,8 +7,6 @@ use smithay::{
         keyboard::{FilterResult, Keysym},
         pointer::{AxisFrame, ButtonEvent, MotionEvent, RelativeMotionEvent},
     },
-    output::Output,
-    desktop::Window,
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::SERIAL_COUNTER,
 };
@@ -222,22 +220,9 @@ pub fn do_compositor_action<B: Backend>(action: &CompositorAction, state: &mut S
     }
 }
 
-fn get_focused_window<B: Backend>(state: &mut State<B>) -> Option<Window> {
-    if let Some(focused) = state.seat.get_keyboard().unwrap().current_focus() {
-        if let Some(window) = state.space.elements().find(|w| w.toplevel().unwrap().wl_surface() == &focused) {
-            return Some(window.clone());
-        }
-    }
-    None
-}
-
-fn get_focused_output<B: Backend>(state: &mut State<B>) -> Option<Output> {
-    let window = get_focused_window(state)?;
-    state.space.outputs_for_element(&window).into_iter().next()
-}
 
 fn quit_focused_window<B: Backend>(state: &mut State<B>) -> Result<(), ()> {
-    if let Some(foucused) = get_focused_window(state) {
+    if let Some(foucused) = state.get_focused_window() {
         if let Some(toplevel) = foucused.toplevel() {
             toplevel.send_close();
             return Ok(());
@@ -272,13 +257,13 @@ pub enum PanDirection {
 }
 
 fn pan_camera_vp<B: Backend>(state: &mut State<B>, direction: PanDirection, degs: f32) -> Result<(), ()> {
-    if let Some(output) = get_focused_output(state) {
+    if let Some(output) = state.get_focused_output() {
         let key = OutputKey::from(&output);
         if let Some(camera) = state.outputs_camera_vp.remove(&key) {
             let rads = degs.to_radians();
             let panmat = match direction {
-                PanDirection::Left => { Mat4::from_rotation_y(-rads) },
-                PanDirection::Right => { Mat4::from_rotation_y(rads) },
+                PanDirection::Left => { Mat4::from_rotation_y(rads) },
+                PanDirection::Right => { Mat4::from_rotation_y(-rads) },
                 PanDirection::Up => { Mat4::from_rotation_x(rads) },
                 PanDirection::Down => { Mat4::from_rotation_x(-rads) },
             };

@@ -22,6 +22,8 @@ pub enum Command {
     ReloadConfigFile,
     /// Do the action of a specific keypress
     DoCompositorAction { action: CompositorAction },
+    /// Get camera information
+    GetCameraInfo,
 }
 
 

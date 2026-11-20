@@ -14,7 +14,7 @@ use tracing::{warn, info};
 use xrcomp::ipc::{Command, CommandResponse};
 use xrcomp::conf::{write_config, get_config_path};
 
-use crate::state::{Backend, State};
+use crate::state::{Backend, State, OutputKey};
 use crate::input::do_compositor_action;
 
 pub(crate) fn init_ipc_listener<B: Backend + 'static>(loop_handle: &LoopHandle<'static, State<B>>, socket_name: &str) {
@@ -168,6 +168,19 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
                     Err(_) => {
                         success = false;
                         result = Some(format!("Failed to perform compositor action {:?}", action));
+                    }
+                }
+            }
+            Command::GetCameraInfo => {
+                info!("IPC command: GetCameraInfo");
+
+                result = Some(format!("Failed to get camera information"));
+                if let Some(fop) = state.get_focused_output() {
+                    if let Some(cameramat) = state.outputs_camera_vp.get(&OutputKey::from(&fop)) {
+                        let (s, r, t) = cameramat.to_scale_rotation_translation();
+                        let aa = r.to_axis_angle();
+                        success = true;
+                        result = Some(format!("Focused output camera info: scale={:?}, rotation={:?} (axis-angle={:?}), translation={:?}", s, r, aa, t));
                     }
                 }
             }

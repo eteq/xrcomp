@@ -249,6 +249,22 @@ impl<BackendData: Backend + 'static> State<BackendData> {
             Ok(())
         }
     }
+
+
+    pub fn get_focused_window(self: &mut Self) -> Option<Window> {
+        if let Some(focused) = self.seat.get_keyboard().unwrap().current_focus() {
+            if let Some(window) = self.space.elements().find(|w| w.toplevel().unwrap().wl_surface() == &focused) {
+                return Some(window.clone());
+            }
+        }
+        None
+    }
+
+    pub fn get_focused_output(self: &mut Self) -> Option<Output> {
+        let window = self.get_focused_window()?;
+        self.space.outputs_for_element(&window).into_iter().next()
+    }
+
 }
 
 /// Data associated with a wayland client that connects to xrcomp.
@@ -281,3 +297,4 @@ impl From<&Output> for OutputKey {
         }
     }
 }
+
