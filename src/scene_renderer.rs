@@ -111,7 +111,7 @@ impl SceneRenderer {
         renderer: &mut GlowRenderer,
         space: &Space<Window>,
         output: &Output,
-        outputs_camera_vp: &mut HashMap<OutputKey, Mat4>,
+        outputs_camera_vp: &mut HashMap<OutputKey, (Mat4, Mat4)>,
     ) -> Option<SceneElement> {
         if self.scenegl.is_none() {
             match renderer.with_context(|gl| unsafe { SceneGl::new(gl) }) {
@@ -177,7 +177,7 @@ impl SceneRenderer {
             }).ok()?;
         }
 
-        let view_proj = match outputs_camera_vp.get(&OutputKey::from(output)) {
+        let (view, proj) = match outputs_camera_vp.get(&OutputKey::from(output)) {
             Some(vp) => { *vp }
             None => {
                 let vp = SceneRenderer::init_view_proj(output_geo);
@@ -192,12 +192,12 @@ impl SceneRenderer {
             commit: self.commit,
             size: output_geo.size.to_physical_precise_round(scale),
             scenegl: Rc::clone(scenegl),
-            view_proj,
+            view_proj: proj * view,
             windowmodels,
         })
     }
 
-    fn init_view_proj(output_geo: Rectangle<i32, Logical>) -> Mat4 {
+    fn init_view_proj(output_geo: Rectangle<i32, Logical>) -> (Mat4, Mat4) {
         // A perspective camera looking straight at the output's rectangle on the z = 0 plane,
         // from the distance at which that rectangle exactly fills the view.
         let w: f32 = output_geo.size.w as f32;
@@ -208,7 +208,7 @@ impl SceneRenderer {
         // World y points down, so "up" for the camera is -y.
         let view = look_at_mat4(center - Vec3::new(0.0, 0.0, distance), center, Vec3::NEG_Y);
         let proj = perspective(FOV_Y, w / h, distance / 100.0, distance * 100.0);
-        proj * view
+        (view, proj)
     }
 
     fn render_window_texture(

@@ -11,6 +11,8 @@ use smithay::reexports::calloop::{Interest, LoopHandle, Mode, PostAction, generi
 
 use tracing::{warn, info};
 
+use glam::Mat4;
+
 use xrcomp::ipc::{Command, CommandResponse};
 use xrcomp::conf::{write_config, get_config_path};
 
@@ -176,11 +178,17 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
 
                 result = Some(format!("Failed to get camera information"));
                 if let Some(fop) = state.get_focused_output() {
-                    if let Some(cameramat) = state.outputs_camera_vp.get(&OutputKey::from(&fop)) {
-                        let (s, r, t) = cameramat.to_scale_rotation_translation();
-                        let aa = r.to_axis_angle();
+                    if let Some((v, p)) = state.outputs_camera_vp.get(&OutputKey::from(&fop)) {
+                        fn mat_info(mat: Mat4) -> String {
+                            let (s, r, t) = mat.to_scale_rotation_translation();
+                            let aa = r.to_axis_angle();
+                            format!("scale={:?}, rotation={:?} (axis-angle={:?}), translation={:?}", s, r, aa, t)
+                        }
                         success = true;
-                        result = Some(format!("Focused output camera info: scale={:?}, rotation={:?} (axis-angle={:?}), translation={:?}", s, r, aa, t));
+                        let vinfo = format!("Focused output view info: {}", mat_info(*v));
+                        let pinfo = format!("Focused output proj info: {}", mat_info(*p));
+                        let vpinfo = format!("Focused output vp info: {}", mat_info(p * v));
+                        result = Some(format!("{}\n{}\n{}", vinfo, pinfo, vpinfo));
                     }
                 }
             }

@@ -267,7 +267,8 @@ fn pan_camera_vp<B: Backend>(state: &mut State<B>, direction: PanDirection, degs
                 PanDirection::Up => { Mat4::from_rotation_x(rads) },
                 PanDirection::Down => { Mat4::from_rotation_x(-rads) },
             };
-            state.outputs_camera_vp.insert(key, camera * panmat);
+            let (v, p) = camera;
+            state.outputs_camera_vp.insert(key, (panmat * v, p));
             return Ok(());
         }
     }

@@ -63,7 +63,7 @@ pub struct State<BackendData: Backend + 'static> {
 
     pub cursor: Cursor,
 
-    pub outputs_camera_vp: HashMap<OutputKey, Mat4>,
+    pub outputs_camera_vp: HashMap<OutputKey, (Mat4, Mat4)>,
 
     #[allow(dead_code)]
     pub ipc_socket_name: String,
