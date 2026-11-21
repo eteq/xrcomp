@@ -73,6 +73,10 @@ void main() {
 /// Vertical field of view of the scene camera.
 const FOV_Y: f32 = std::f32::consts::FRAC_PI_3;
 
+/// Moves the centered unit quad so its top-left corner is at the origin, i.e. it spans
+/// [0, 1] in x and [-1, 0] for y. Model matrices then place a window by its top-left corner.
+const QUAD_ANCHOR: Mat4 = Mat4::from_cols(Vec4::X, Vec4::Y, Vec4::Z, Vec4::new(0.5, -0.5, 0.0, 1.0));
+
 /// GPU cache for drawing the scene: per-window textures and the GL objects for the quad
 /// pass. Everything in here belongs to one renderer, so it lives next to that renderer in
 /// each backend's data and can be dropped and rebuilt along with it.
@@ -148,16 +152,20 @@ impl SceneRenderer {
                 }
             };
 
-            // World units are logical pixels, with x right, y down and z into the screen
-            // (away from the viewer); a right-handed system.
+            // World units are logical pixels, with x right, y up and z out of the screen
+            // (toward the viewer); a right-handed system,
+            // `Space` coordinates are y-down, so a `Space` point (x, y) sits at world
+            // (x, -y, 0).
             // The surface origin sits at the window's space location minus its geometry
             // offset (as in `Space`), and the texture covers `bbox` relative to that origin.
             let Some(location) = space.element_location(window) else {
                 continue;
             };
             let origin = location - window.geometry().loc + bbox.loc;
+            // The unit quad (see `QUAD_ANCHOR`) hangs down from its top-left corner, so
+            // translating it to the origin's world position puts the window's top-left there.
             let model_matrix = window_placement(window)
-                * Mat4::from_translation(Vec3::new(origin.x as f32, origin.y as f32, 0.0))
+                * Mat4::from_translation(Vec3::new(origin.x as f32, -origin.y as f32, 0.0))
                 * Mat4::from_scale(Vec3::new(bbox.size.w as f32, bbox.size.h as f32, 1.0));
 
             windowmodels.push(WindowModel { texture, model_matrix, shape: ShapeType::Quad });
@@ -202,11 +210,12 @@ impl SceneRenderer {
         // from the distance at which that rectangle exactly fills the view.
         let w: f32 = output_geo.size.w as f32;
         let h = output_geo.size.h as f32;
-        let center = Vec3::new(output_geo.loc.x as f32 + w / 2.0, output_geo.loc.y as f32 + h / 2.0, 0.0);
+        // The output's `Space` rectangle, converted to world (y-up) coordinates.
+        let center = Vec3::new(output_geo.loc.x as f32 + w / 2.0, -(output_geo.loc.y as f32 + h / 2.0), 0.0);
         let distance = (h / 2.0) / (FOV_Y / 2.0).tan();
 
-        // World y points down, so "up" for the camera is -y.
-        let view = look_at_mat4(center - Vec3::new(0.0, 0.0, distance), center, Vec3::NEG_Y);
+        // The viewer is on the +z side of the screen, looking toward -z.
+        let view = look_at_mat4(center + Vec3::new(0.0, 0.0, distance), center, Vec3::Y);
         let proj = perspective(FOV_Y, w / h, distance / 100.0, distance * 100.0);
         (view, proj)
     }
@@ -288,10 +297,11 @@ unsafe fn init_texture_params(gl: &glow::Context, texture: &GlesTexture) {
 
 /// Converts standard GL clip space (+y up) into what Smithay's frame expects for the bound
 /// target and output transform. This mirrors the `flip180 * transform.matrix()` part of
-/// the projection in `GlesRenderer::render`.
+/// the projection in `GlesRenderer::render`, where the y flip is called `flip180` even
+/// though it is a reflection, not a rotation (so it also reverses triangle winding).
 fn transform_matrix(transform: Transform) -> Mat4 {
-    let flip180 = Affine2::from_cols_array(&[1.0, 0.0, 0.0, -1.0, 0.0, 0.0]);
-    let m = flip180 * transform.matrix();
+    let flip_y = Affine2::from_cols_array(&[1.0, 0.0, 0.0, -1.0, 0.0, 0.0]);
+    let m = flip_y * transform.matrix();
     Mat4::from_cols(
         Vec4::new(m.x_axis.x, m.x_axis.y, 0.0, 0.0),
         Vec4::new(m.y_axis.x, m.y_axis.y, 0.0, 0.0),
@@ -394,9 +404,7 @@ impl SceneGl {
                 };
                 gl.bind_texture(glow::TEXTURE_2D, Some(glow::NativeTexture(tex_id)));
 
-                let offset = Mat4::from_translation(Vec3::new(0.5, 0.5, 0.0));
-
-                let mvp = view_proj * model.model_matrix * offset;
+                let mvp = view_proj * model.model_matrix * QUAD_ANCHOR;
                 gl.uniform_matrix_4_f32_slice(Some(&self.u_mvp), false, &mvp.to_cols_array());
 
                 gl.draw_arrays(SceneVertex::DRAW_MODE, 0, nverts);
@@ -521,11 +529,13 @@ enum ShapeType {
 impl ShapeType {
     fn get_vertices(&self) -> Vec<SceneVertex> {
         match self {
+            // Window textures have the window's top row at t = 0, so the top (+y) vertices
+            // get t = 0. Order is top-left, top-right, bottom-left, bottom-right.
             ShapeType::Quad => vec![
-                SceneVertex { pos: Vec3::new(-0.5, -0.5, 0.0), st: Vec2::new(0.0, 0.0) },
-                SceneVertex { pos: Vec3::new( 0.5, -0.5, 0.0), st: Vec2::new(1.0, 0.0) },
-                SceneVertex { pos: Vec3::new(-0.5,  0.5, 0.0), st: Vec2::new(0.0, 1.0) },
-                SceneVertex { pos: Vec3::new( 0.5,  0.5, 0.0), st: Vec2::new(1.0, 1.0) },
+                SceneVertex { pos: Vec3::new(-0.5,  0.5, 0.0), st: Vec2::new(0.0, 0.0) },
+                SceneVertex { pos: Vec3::new( 0.5,  0.5, 0.0), st: Vec2::new(1.0, 0.0) },
+                SceneVertex { pos: Vec3::new(-0.5, -0.5, 0.0), st: Vec2::new(0.0, 1.0) },
+                SceneVertex { pos: Vec3::new( 0.5, -0.5, 0.0), st: Vec2::new(1.0, 1.0) },
             ],
         }
     }
