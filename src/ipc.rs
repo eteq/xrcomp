@@ -24,6 +24,8 @@ pub enum Command {
     DoCompositorAction { action: CompositorAction },
     /// Get camera information
     GetCameraInfo,
+    /// Get window information
+    GetWindowsInfo,
 }
 
 

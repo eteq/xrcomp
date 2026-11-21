@@ -8,6 +8,7 @@ use interprocess::os::unix::uds_local_socket::Stream as UdsStream;
 use std::io::{self, Read};
 
 use smithay::reexports::calloop::{Interest, LoopHandle, Mode, PostAction, generic::Generic};
+use smithay::wayland::{compositor::with_states, shell::xdg::XdgToplevelSurfaceData};
 
 use tracing::{warn, info};
 
@@ -191,6 +192,37 @@ pub fn process_message<B: Backend + 'static>(message_bytes: &[u8], state: &mut S
                         result = Some(format!("{}\n{}\n{}", vinfo, pinfo, vpinfo));
                     }
                 }
+            }
+            Command::GetWindowsInfo => {
+                info!("IPC command: GetWindowsInfo");
+                let mut infostring = String::new();
+                for window in state.space.elements() {
+                    
+                    infostring.push_str(&format!("Window ID: {:?}\n", window.id()));
+                    if let Some(toplevel) = window.toplevel() {
+                        with_states(toplevel.wl_surface(), |states| {
+                            let role = states
+                                .data_map
+                                .get::<XdgToplevelSurfaceData>()
+                                .unwrap()
+                                .lock()
+                                .unwrap();
+                            infostring.push_str(&format!("Wayland top-level role info: {:?}\n", role));
+                        });
+                    }
+                    // For if in the future we implement xwayland
+                    // if let Some(x11) = window.x11_surface() {
+                    //     infostring.push_str(&format!("X11 window.  title: {:?}, class: {:?}\n", x11.title(), x11.class()));
+                    // };
+
+                    infostring.push_str("\n");
+                }
+                // Remove the last two newline characters or no-op if empty
+                infostring.pop(); 
+                infostring.pop();
+
+                success = true;
+                result = Some(infostring);
             }
         };        
 
