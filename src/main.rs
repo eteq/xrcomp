@@ -4,7 +4,6 @@ mod input;
 mod compositor_ipc;
 mod render_helpers;
 mod scene_renderer;
-mod scene_layout;
 mod state;
 
 #[cfg(not(any(feature = "udev", feature = "winit", feature = "x11")))]

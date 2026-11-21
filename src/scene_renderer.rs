@@ -45,7 +45,6 @@ use smithay::{
 use bytemuck;
 use tracing::warn;
 
-use crate::scene_layout::window_placement;
 use crate::state::OutputKey;
 
 const VERTEX_SHADER: &str = r#"#version 100
@@ -164,7 +163,7 @@ impl SceneRenderer {
             let origin = location - window.geometry().loc + bbox.loc;
             // The unit quad (see `QUAD_ANCHOR`) hangs down from its top-left corner, so
             // translating it to the origin's world position puts the window's top-left there.
-            let model_matrix = window_placement(window)
+            let model_matrix = Mat4::IDENTITY // Later replace with a position?
                 * Mat4::from_translation(Vec3::new(origin.x as f32, -origin.y as f32, 0.0))
                 * Mat4::from_scale(Vec3::new(bbox.size.w as f32, bbox.size.h as f32, 1.0));
 
@@ -552,4 +551,27 @@ impl ShapeType {
         
         (vbo, vertices.len() as i32)
     }
+}
+
+// These helpers serve two purposes: 1) defaulting to opengl conventions, 2) interface these functions that are new in glam 0.34 to smithay's required glam
+#[allow(dead_code)]
+fn look_at_model(position: Vec3, target: Vec3, up: Vec3) -> Mat4 {
+    let positionn = glam_newer::Vec3::from_array(position.to_array());
+    let targetn = glam_newer::Vec3::from_array(target.to_array());
+    let upn = glam_newer::Vec3::from_array(up.to_array());
+    let newmat4 = glam_newer::camera::model::look_at_mat4(positionn, targetn, upn,
+        glam_newer::Vec3::NEG_Z, glam_newer::Vec3::Y);
+
+    Mat4::from_cols_array(&newmat4.to_cols_array())
+}
+
+#[allow(dead_code)]
+fn look_to_model(position: Vec3, dir: Vec3, up: Vec3) -> Mat4 {
+    let positionn = glam_newer::Vec3::from_array(position.to_array());
+    let dirn = glam_newer::Vec3::from_array(dir.to_array());
+    let upn = glam_newer::Vec3::from_array(up.to_array());
+    let newmat4 = glam_newer::camera::model::look_to_mat4(positionn, dirn, upn,
+        glam_newer::Vec3::NEG_Z, glam_newer::Vec3::Y);
+
+    Mat4::from_cols_array(&newmat4.to_cols_array())
 }
